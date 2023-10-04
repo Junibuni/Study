@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 import types
 from numpy import random
-
+import random as rnd
 
 def intersect(box_a, box_b):
     max_xy = np.minimum(box_a[:, 2:], box_b[2:])
@@ -197,7 +197,7 @@ class RandomBrightness(object):
         self.delta = delta
 
     def __call__(self, image, boxes=None, labels=None):
-        if random.randint(2):
+        if random.randint(0, 2):
             delta = random.uniform(-self.delta, self.delta)
             image += delta
         return image, boxes, labels
@@ -243,8 +243,8 @@ class RandomSampleCrop(object):
         height, width, _ = image.shape
         while True:
             # randomly choose a mode
-            mode = random.choice(self.sample_options)
-            if mode is None:
+            mode = rnd.choice(self.sample_options)
+            if mode is (float("inf"),float("inf")):
                 return image, boxes, labels
 
             min_iou, max_iou = mode
