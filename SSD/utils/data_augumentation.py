@@ -244,7 +244,7 @@ class RandomSampleCrop(object):
         while True:
             # randomly choose a mode
             mode = rnd.choice(self.sample_options)
-            if mode is (float("inf"),float("inf")):
+            if mode is None:
                 return image, boxes, labels
             
             min_iou, max_iou = mode
