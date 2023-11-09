@@ -3,3 +3,7 @@ Papers
 */.ipynb_checkpoints/*
 .DS_Store
 */.DS_Store/*
+.data
+*/.data/*
+.weights
+*/.weights/*
