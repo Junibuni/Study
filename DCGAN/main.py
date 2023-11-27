@@ -70,14 +70,14 @@ def main(args):
         losses_header = ["loss_G_train", "loss_D_real_train", "loss_D_fake_train", "loss_D_train"]
         losses_list = [loss_G_train, loss_D_real_train, loss_D_fake_train, loss_D_train]
         loss_dict = dict(zip(losses_header, losses_list))
-        loss_save_path = os.path.join(os.getcwd(), "losses", args.dataset, ".pkl")
+        loss_save_path = os.path.join(os.getcwd(), "losses", args.dataset + ".pkl")
         with open(loss_save_path, "wb") as file:
             pickle.dump(loss_dict, file)
             print(f"losses saved in {loss_save_path}")
 
     elif args.mode == "eval":
         epoch, netG = load_ckpt(ckpt_path, epoch, netG, optimizerG, netD, optimizerD, train=False)
-        evaluate_one_epoch()
+        evaluate_one_epoch(netG, device)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="DCGAN")
@@ -85,7 +85,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode", default="train", choices=["train", "test"], type=str, dest="mode")
     parser.add_argument("--lr", default=2e-4, type=float, dest="lr")
     parser.add_argument("--batch_size", default=128, type=int, dest="batch_size")
-    parser.add_argument("--num_epoch", default=5, type=int, dest="num_epoch")
+    parser.add_argument("--num_epoch", default=10, type=int, dest="num_epoch")
     parser.add_argument("--train_continue", default=False, type=bool, dest="train_continue")
     parser.add_argument("--ckpt_path", default="./DCGAN/checkpoint", type=str, dest="ckpt_path")
     parser.add_argument("--log_dir", default="./DCGAN/log", type=str, dest="log_dir")

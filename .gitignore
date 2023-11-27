@@ -12,3 +12,4 @@ Papers
 .weights
 */.weights/*
 venv
+*/checkpoint/*
