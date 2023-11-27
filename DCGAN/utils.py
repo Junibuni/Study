@@ -7,6 +7,7 @@ def mkdir(*path):
     for p in path:
         if not os.path.exists(p):
             os.makedirs(p)
+            print(f"creating: {p}")
 
 def save_ckpt(ckpt_dir, epoch, netG, optimG, netD, optimD):
     mkdir(ckpt_dir)
@@ -19,7 +20,7 @@ def save_ckpt(ckpt_dir, epoch, netG, optimG, netD, optimD):
     }
     torch.save(save_dict, f"{ckpt_dir}/epoch{epoch}.pth")
 
-def load_ckpt(ckpt_dir, netG, optimG, netD, optimD):
+def load_ckpt(ckpt_dir, netG, optimG, netD, optimD, train=True):
     if not os.path.exists(ckpt_dir):
         epoch = 0
         return epoch, netG, optimG, netD, optimD
@@ -27,16 +28,18 @@ def load_ckpt(ckpt_dir, netG, optimG, netD, optimD):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     ckpt_list = os.listdir(ckpt_dir)
     ckpt_list.sort(key=lambda x:int(''.join(filter(str.isdigit, x))))
-
-    dict_model = torch.load(f"{ckpt_dir}/{ckpt_list[-1]}", map_location=device)
-
-    netG.load_state_dict(dict_model['netG'])
-    netD.load_state_dict(dict_model['netD'])
-    optimG.load_state_dict(dict_model['optimG'])
-    optimD.load_state_dict(dict_model['optimD'])
     epoch = int(ckpt_list[-1].split('epoch')[1].split('.pth')[0])
-
-    return epoch, netG, optimG, netD, optimD
+    dict_model = torch.load(f"{ckpt_dir}/{ckpt_list[-1]}", map_location=device)
+    print(f"load with epoch {epoch}")
+    if train:
+        netG.load_state_dict(dict_model['netG'])
+        netD.load_state_dict(dict_model['netD'])
+        optimG.load_state_dict(dict_model['optimG'])
+        optimD.load_state_dict(dict_model['optimD'])
+        return epoch, netG, optimG, netD, optimD
+    else:
+        netG.load_state_dict(dict_model['netG'])
+        return epoch, netG
 
 def train_one_epoch(
     netG,
@@ -56,6 +59,7 @@ def train_one_epoch(
     loss_G_train = []
     loss_D_real_train = []
     loss_D_fake_train = [] #D(G(z))
+    loss_D_train = []
     
     for batch_idx, (images, _) in tqdm(enumerate(dataloader)):
         batch_size = len(images)
@@ -82,6 +86,7 @@ def train_one_epoch(
         loss_D_fake_train.append(fake_loss_D.item())
 
         loss_D = real_loss_D + fake_loss_D
+        loss_D_train.append(loss_D.item())
         optimD.step()
 
         """
@@ -95,22 +100,20 @@ def train_one_epoch(
         optimG.step()
 
         if batch_idx % 10 == 0:
-            print(f"[{epoch}/{num_epochs}][{batch_idx}/{batch_size}]\tLoss_D: {loss_D.item()}\tLoss_G: {loss_G.item()}")
+            print(f"[{epoch}/{num_epochs}][{batch_idx}/{len(dataloader)}]\tLoss_D: {loss_D.item()}\tLoss_G: {loss_G.item()}")
 
-        if epoch % 2 == 0:
+        if epoch % 2 == 0 or epoch == num_epochs:
             save_ckpt(ckpt_dir, epoch, netG, optimG, netD, optimD)
+    
+    return loss_G_train, loss_D_real_train, loss_D_fake_train, loss_D_train
 
 @torch.no_grad()
 def evaluate_one_epoch(
     generator,
-    discriminator, 
     device, 
-    criterion, 
-    dataloader
     ):
     
     generator.eval()
-    discriminator.eval()
     input_z = torch.randn(batchsize, 100, 1, 1, device=device)
     output = generator(input_z)
 

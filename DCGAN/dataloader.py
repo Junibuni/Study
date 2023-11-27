@@ -6,6 +6,8 @@ def get_dataloader(data_dir, dataset, batch_size=128, train=True):
     transform = transforms.Compose([
         transforms.Resize(64),
         transforms.CenterCrop(64),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
@@ -13,6 +15,8 @@ def get_dataloader(data_dir, dataset, batch_size=128, train=True):
         dataset = datasets.CIFAR10(root=data_dir, download=True, transform=transform)
     elif dataset == "celeba":
         dataset = datasets.CelebA(root=data_dir, download=True, transform=transform)
+    else:
+        raise ValueError("Use Valid Dataset")
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=train)
 
     return dataloader

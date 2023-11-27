@@ -1,6 +1,7 @@
 import os
 import argparse
 import random
+import pickle
 import torch
 from torch import optim
 from torch import nn
@@ -33,15 +34,21 @@ def main(args):
     datapath = os.path.join(args.data_dir, args.dataset)
     ckpt_path = os.path.join(args.ckpt_path, args.dataset)
     log_path = os.path.join(args.log_dir, args.dataset)
-    mkdir([datapath, ckpt_path, log_path])
+    mkdir(datapath, ckpt_path, log_path)
 
     if args.mode == "train":
-        dataloader = get_dataloader(datapath, args.batch_size, train=True)
+        loss_G_train = []
+        loss_D_real_train = []
+        loss_D_fake_train = []
+        loss_D_train = []
+
+        dataloader = get_dataloader(datapath, args.dataset, args.batch_size, train=True)
 
         if args.train_continue:
-            epoch, netG, optimG, netD, optimD = load_ckpt(ckpt_path, epoch, netG, optimG, netD, optimD)
+            epoch, netG, optimizerG, netD, optimizerD = load_ckpt(ckpt_path, epoch, netG, optimizerG, netD, optimizerD, train=True)
             
         for epoch in range(args.num_epoch):
+            loss_G_train_per_epoch, loss_D_real_train_per_epoch, loss_D_fake_train_per_epoch, loss_D_train_per_epoch = \
             train_one_epoch(
                netG,
                optimizerG,
@@ -54,8 +61,22 @@ def main(args):
                args.num_epoch,
                ckpt_path
             )
+            loss_G_train.extend(loss_G_train_per_epoch)
+            loss_D_real_train.extend(loss_D_real_train_per_epoch)
+            loss_D_fake_train.extend(loss_D_fake_train_per_epoch)
+            loss_D_train.extend(loss_D_train_per_epoch)
+        
+        #save losses
+        losses_header = ["loss_G_train", "loss_D_real_train", "loss_D_fake_train", "loss_D_train"]
+        losses_list = [loss_G_train, loss_D_real_train, loss_D_fake_train, loss_D_train]
+        loss_dict = dict(zip(losses_header, losses_list))
+        loss_save_path = os.path.join(os.getcwd(), "losses", args.dataset, ".pkl")
+        with open(loss_save_path, "wb") as file:
+            pickle.dump(loss_dict, file)
+            print(f"losses saved in {loss_save_path}")
 
     elif args.mode == "eval":
+        epoch, netG = load_ckpt(ckpt_path, epoch, netG, optimizerG, netD, optimizerD, train=False)
         evaluate_one_epoch()
 
 if __name__ == "__main__":
@@ -73,8 +94,8 @@ if __name__ == "__main__":
 
     parser.add_argument("--nc", default=3, type=int, dest="nc")
     parser.add_argument("--nz", default=100, type=int, dest="nz")
-    parser.add_argument("--ngf", default=128, type=int, dest="ngf")
-    parser.add_argument("--ndf", default=128, type=int, dest="ndf")
+    parser.add_argument("--ngf", default=64, type=int, dest="ngf")
+    parser.add_argument("--ndf", default=64, type=int, dest="ndf")
     parser.add_argument("--beta", default=0.5, type=float, dest="beta")
 
     parser.add_argument("--seed", default=999, type=int, dest="seed")
