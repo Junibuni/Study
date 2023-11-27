@@ -3,9 +3,13 @@ import torch
 from torch import nn
 from tqdm import tqdm 
 
+def mkdir(*path):
+    for p in path:
+        if not os.path.exists(p):
+            os.makedirs(p)
+
 def save_ckpt(ckpt_dir, epoch, netG, optimG, netD, optimD):
-    if not os.path.exists(ckpt_dir):
-        os.makedirs(ckpt_dir)
+    mkdir(ckpt_dir)
     save_dict = {
         "epoch": epoch,
         "netG": netG,

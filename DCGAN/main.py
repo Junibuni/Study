@@ -6,7 +6,11 @@ from torch import optim
 from torch import nn
 
 from models import Generator, Discriminator
-from utils import train_one_epoch, evaluate_one_epoch, init_weight, load_ckpt
+from utils import (train_one_epoch, 
+                   evaluate_one_epoch, 
+                   init_weight, 
+                   load_ckpt,
+                   mkdir)
 from dataloader import get_dataloader
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -25,12 +29,17 @@ def main(args):
     criterion = nn.BCELoss()
     optimizerG = torch.optim.Adam(netG.parameters(), lr=args.lr, betas=(args.beta, 0.999))
     optimizerD = torch.optim.Adam(netD.parameters(), lr=args.lr, betas=(args.beta, 0.999))
-    
+
+    datapath = os.path.join(args.data_dir, args.dataset)
+    ckpt_path = os.path.join(args.ckpt_path, args.dataset)
+    log_path = os.path.join(args.log_dir, args.dataset)
+    mkdir([datapath, ckpt_path, log_path])
+
     if args.mode == "train":
-        dataloader = get_dataloader(args.data_dir, args.batch_size, train=True)
+        dataloader = get_dataloader(datapath, args.batch_size, train=True)
 
         if args.train_continue:
-            epoch, netG, optimG, netD, optimD = load_ckpt(args.ckpt_path, epoch, netG, optimG, netD, optimD)
+            epoch, netG, optimG, netD, optimD = load_ckpt(ckpt_path, epoch, netG, optimG, netD, optimD)
             
         for epoch in range(args.num_epoch):
             train_one_epoch(
@@ -43,7 +52,7 @@ def main(args):
                dataloader,
                epoch,
                args.num_epoch,
-               args.ckpt_path
+               ckpt_path
             )
 
     elif args.mode == "eval":
@@ -56,10 +65,11 @@ if __name__ == "__main__":
     parser.add_argument("--lr", default=2e-4, type=float, dest="lr")
     parser.add_argument("--batch_size", default=128, type=int, dest="batch_size")
     parser.add_argument("--num_epoch", default=5, type=int, dest="num_epoch")
-    parser.add_argument("--ckpt_path", default="./DCGAN/checkpoint", type=str, dest="ckpt_path")
     parser.add_argument("--train_continue", default=False, type=bool, dest="train_continue")
+    parser.add_argument("--ckpt_path", default="./DCGAN/checkpoint", type=str, dest="ckpt_path")
     parser.add_argument("--log_dir", default="./DCGAN/log", type=str, dest="log_dir")
     parser.add_argument("--data_dir", default="./DCGAN/datasets", type=str, dest="data_dir")
+    parser.add_argument("--dataset", default="cifar10", choices=["cifar10", "celeba"], type=str, dest="dataset")
 
     parser.add_argument("--nc", default=3, type=int, dest="nc")
     parser.add_argument("--nz", default=100, type=int, dest="nz")
