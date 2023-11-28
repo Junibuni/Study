@@ -34,7 +34,9 @@ def main(args):
     datapath = os.path.join(args.data_dir, args.dataset)
     ckpt_path = os.path.join(args.ckpt_path, args.dataset)
     log_path = os.path.join(args.log_dir, args.dataset)
-    mkdir(datapath, ckpt_path, log_path)
+    loss_path = os.path.join(args.ckpt_path, "losses")
+    result_path = os.path.join(args.result_dir, args.dataset)
+    mkdir(datapath, ckpt_path, log_path, loss_path, result_path)
 
     if args.mode == "train":
         loss_G_train = []
@@ -45,9 +47,9 @@ def main(args):
         dataloader = get_dataloader(datapath, args.dataset, args.batch_size, train=True)
 
         if args.train_continue:
-            epoch, netG, optimizerG, netD, optimizerD = load_ckpt(ckpt_path, epoch, netG, optimizerG, netD, optimizerD, train=True)
+            epoch, netG, optimizerG, netD, optimizerD = load_ckpt(ckpt_path, netG, optimizerG, netD, optimizerD, train=True)
             
-        for epoch in range(args.num_epoch):
+        for epoch in range(1, args.num_epoch+1):
             loss_G_train_per_epoch, loss_D_real_train_per_epoch, loss_D_fake_train_per_epoch, loss_D_train_per_epoch = \
             train_one_epoch(
                netG,
@@ -59,7 +61,9 @@ def main(args):
                dataloader,
                epoch,
                args.num_epoch,
-               ckpt_path
+               ckpt_path,
+               result_path,
+               args.dataset
             )
             loss_G_train.extend(loss_G_train_per_epoch)
             loss_D_real_train.extend(loss_D_real_train_per_epoch)
@@ -70,14 +74,14 @@ def main(args):
         losses_header = ["loss_G_train", "loss_D_real_train", "loss_D_fake_train", "loss_D_train"]
         losses_list = [loss_G_train, loss_D_real_train, loss_D_fake_train, loss_D_train]
         loss_dict = dict(zip(losses_header, losses_list))
-        loss_save_path = os.path.join(os.getcwd(), "losses", args.dataset + ".pkl")
+        loss_save_path = os.path.join(args.ckpt_path, "losses", args.dataset + ".pkl")
         with open(loss_save_path, "wb") as file:
             pickle.dump(loss_dict, file)
             print(f"losses saved in {loss_save_path}")
 
-    elif args.mode == "eval":
-        epoch, netG = load_ckpt(ckpt_path, epoch, netG, optimizerG, netD, optimizerD, train=False)
-        evaluate_one_epoch(netG, device)
+    elif args.mode == "test":
+        epoch, netG = load_ckpt(ckpt_path, netG, optimizerG, netD, optimizerD, train=False)
+        evaluate_one_epoch(netG, device, args)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="DCGAN")
@@ -85,12 +89,13 @@ if __name__ == "__main__":
     parser.add_argument("--mode", default="train", choices=["train", "test"], type=str, dest="mode")
     parser.add_argument("--lr", default=2e-4, type=float, dest="lr")
     parser.add_argument("--batch_size", default=128, type=int, dest="batch_size")
-    parser.add_argument("--num_epoch", default=10, type=int, dest="num_epoch")
+    parser.add_argument("--num_epoch", default=50, type=int, dest="num_epoch")
     parser.add_argument("--train_continue", default=False, type=bool, dest="train_continue")
     parser.add_argument("--ckpt_path", default="./DCGAN/checkpoint", type=str, dest="ckpt_path")
     parser.add_argument("--log_dir", default="./DCGAN/log", type=str, dest="log_dir")
     parser.add_argument("--data_dir", default="./DCGAN/datasets", type=str, dest="data_dir")
-    parser.add_argument("--dataset", default="cifar10", choices=["cifar10", "celeba"], type=str, dest="dataset")
+    parser.add_argument("--result_dir", default="./DCGAN/results", type=str, dest="result_dir")
+    parser.add_argument("--dataset", default="celeba", choices=["cifar10", "celeba"], type=str, dest="dataset")
 
     parser.add_argument("--nc", default=3, type=int, dest="nc")
     parser.add_argument("--nz", default=100, type=int, dest="nz")
