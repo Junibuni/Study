@@ -89,7 +89,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode", default="train", choices=["train", "test"], type=str, dest="mode")
     parser.add_argument("--lr", default=2e-4, type=float, dest="lr")
     parser.add_argument("--batch_size", default=128, type=int, dest="batch_size")
-    parser.add_argument("--num_epoch", default=50, type=int, dest="num_epoch")
+    parser.add_argument("--num_epoch", default=100, type=int, dest="num_epoch")
     parser.add_argument("--train_continue", default=False, type=bool, dest="train_continue")
     parser.add_argument("--ckpt_path", default="./DCGAN/checkpoint", type=str, dest="ckpt_path")
     parser.add_argument("--log_dir", default="./DCGAN/log", type=str, dest="log_dir")

@@ -13,7 +13,7 @@ def get_dataloader(data_dir, dataset, batch_size=128, train=True):
     if dataset == "cifar10":
         dataset = datasets.CIFAR10(root=data_dir, download=True, transform=transform)
     elif dataset == "celeba":
-        dataset = datasets.CelebA(root=data_dir, download=False, transform=transform)
+        dataset = datasets.ImageFolder(root=data_dir, transform=transform)
     else:
         raise ValueError("Use Valid Dataset")
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=train)
