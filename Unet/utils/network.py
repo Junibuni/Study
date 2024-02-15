@@ -23,3 +23,31 @@ class Down(nn.Module):
     # downsample, doubleconv
     def __init__(self, in_channel, out_channel):
         super(Down, self).__init__()
+        self.up_double_conv = nn.Sequential(
+            nn.MaxPool2d(2),
+            DoubleConv(in_channel, out_channel)
+        )
+    
+    def __forward__(self, x):
+        return self.up_double_conv(x)
+    
+class Up(nn.Module):
+    def __init__(self, in_channel, out_channel):
+        super(Up, self).__init__()
+        self.up_conv = nn.ConvTranspose2d(in_channel, out_channel//2, kernel_size=2, stride=2) # halves out channel
+        self.double_conv = DoubleConv(in_channel, out_channel)
+
+    def forward(self, x, in_feature):
+        x = self.up_conv(x)
+
+        # TODO: Need padding/cropping in concat?
+        x = torch.cat([in_feature, x], dim=1)
+        return self.double_conv(x)
+    
+class FinalConv(nn.Module):
+    def __init__(self, in_channel, out_channel):
+        super(FinalConv, self).__init__()
+        self.conv = nn.Conv2d(in_channel, out_channel, kernel_size=1)
+    
+    def forward(self, x):
+        return self.conv(x)
