@@ -45,9 +45,9 @@ class Up(nn.Module):
         return self.double_conv(x)
     
 class FinalConv(nn.Module):
-    def __init__(self, in_channel, out_channel):
+    def __init__(self, in_channel, num_classes=5):
         super(FinalConv, self).__init__()
-        self.conv = nn.Conv2d(in_channel, out_channel, kernel_size=1)
+        self.conv = nn.Conv2d(in_channel, num_classes, kernel_size=1)
     
     def forward(self, x):
         return self.conv(x)

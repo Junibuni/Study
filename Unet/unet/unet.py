@@ -2,5 +2,8 @@
 import torch
 import torch.nn as nn
 
+from . import network
+
 class UNet(nn.Module):
-    def __init__(self, ):
+    def __init__(self, in_channels=3, classes=5):
+        pass

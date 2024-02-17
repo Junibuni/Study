@@ -9,6 +9,7 @@ Papers
 */datasets/*
 .__pycache__
 */__pycache__/*
+**/__pycache__
 .weights
 */.weights/*
 venv
