@@ -4,8 +4,9 @@ import torch.nn as nn
 from . import network
 
 class UNetDecoder(nn.Module):
-    def __init__(self, encoder, in_channels, num_classes=5):
-        self.encoder = encoder
+    def __init__(self, in_channels, skip_layers, num_classes=5):
+        super(UNetDecoder, self).__init__()
+        self.skip_layers = skip_layers
 
         self.module1 = network.Up(in_channels, in_channels/2)
         self.module2 = network.Up(in_channels/2, in_channels/4)

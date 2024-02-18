@@ -1,16 +1,16 @@
 import torch
 import torch.nn as nn
 import torchvision.models as models
-from torchvision.models import (ResNet152_Weights,
-                                EfficientNet_B7_Weights,
+from torchvision.models import (ResNet50_Weights,
+                                EfficientNet_B4_Weights,
                                 VGG19_BN_Weights)
 
 from . import network
 
 def get_backbone(backbone_name):
     model_loaders = {
-        'resnet152': [models.resnet152, ResNet152_Weights],
-        'efficientnetb7': [models.efficientnet_b7, EfficientNet_B7_Weights],
+        'resnet50': [models.resnet50, ResNet50_Weights],
+        'efficientnetb4': [models.efficientnet_b4, EfficientNet_B4_Weights],
         'vgg19': [models.vgg19_bn, VGG19_BN_Weights],
         'unet': [UNetEncoder, None]
     }
