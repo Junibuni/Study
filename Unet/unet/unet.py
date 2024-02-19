@@ -19,7 +19,8 @@ class UNet(nn.Module):
         self.final_module = network.FinalConv(64, num_classes)
 
     def forward(self, x):
-      
+        features_for_concat = self.extract_features(self.encoder, x, self.layer[:-1])
+
         return x, features
     
     @property
@@ -45,7 +46,7 @@ class UNet(nn.Module):
     def extract_features(model, input_tensor, layer_names):
         extracted_features = {}
         cnt = 1
-        
+
         def hook(module, input, output):
             nonlocal extracted_features, cnt
             extracted_features[f"skip_{cnt}"] = output
