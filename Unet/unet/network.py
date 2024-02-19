@@ -32,10 +32,10 @@ class Down(nn.Module):
         return self.up_double_conv(x)
     
 class Up(nn.Module):
-    def __init__(self, in_channel, out_channel):
+    def __init__(self, in_channel, out_channel, concat_channel):
         super(Up, self).__init__()
-        self.up_conv = nn.ConvTranspose2d(in_channel, out_channel//2, kernel_size=2, stride=2) # halves out channel
-        self.double_conv = DoubleConv(in_channel, out_channel)
+        self.up_conv = nn.ConvTranspose2d(in_channel, out_channel, kernel_size=2, stride=2) # halves out channel
+        self.double_conv = DoubleConv(in_channel+concat_channel, out_channel)
 
     def forward(self, x, in_feature):
         x = self.up_conv(x)

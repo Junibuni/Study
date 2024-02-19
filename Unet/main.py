@@ -5,4 +5,7 @@ import torchvision
 
 from unet.backbone import get_backbone
 
-#efficientnet_b0 = get_backbone("efficientnetb4")
+from torchinfo import summary
+model = get_backbone("efficientnetb0")
+
+#print(summary(efficientnet_b0, input_size=(1, 3, 224, 224)))
