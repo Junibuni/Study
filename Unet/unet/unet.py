@@ -19,8 +19,12 @@ class UNet(nn.Module):
         self.final_module = network.FinalConv(64, num_classes)
 
     def forward(self, x):
-        features_for_concat = self.extract_features(self.encoder, x, (layer:=self.layer[:-1]))
-        x = self.module1(x, features_for_concat[layer.pop()])
+        # Encoder
+        features_for_concat = self.extract_features(self.encoder, x, (layer:=self.layer.copy()))
+        backbone_feature = features_for_concat[layer.pop()]
+
+        # Decoder
+        x = self.module1(backbone_feature, features_for_concat[layer.pop()])
         x = self.module2(x, features_for_concat[layer.pop()])
         x = self.module3(x, features_for_concat[layer.pop()])
         x = self.module4(x, features_for_concat[layer.pop()])
@@ -36,6 +40,7 @@ class UNet(nn.Module):
             "efficientnetb0": [],
             "vgg19": [],
         }
+        return layer_concat[self.backbone_name]
     
     @property
     def size(self):
