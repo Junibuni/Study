@@ -19,9 +19,13 @@ class UNet(nn.Module):
         self.final_module = network.FinalConv(64, num_classes)
 
     def forward(self, x):
-        features_for_concat = self.extract_features(self.encoder, x, self.layer[:-1])
-
-        return x, features
+        features_for_concat = self.extract_features(self.encoder, x, (layer:=self.layer[:-1]))
+        x = self.module1(x, features_for_concat[layer.pop()])
+        x = self.module2(x, features_for_concat[layer.pop()])
+        x = self.module3(x, features_for_concat[layer.pop()])
+        x = self.module4(x, features_for_concat[layer.pop()])
+        out = self.final_module(x)
+        return out
     
     @property
     def layer(self):
@@ -35,8 +39,9 @@ class UNet(nn.Module):
     
     @property
     def size(self):
+        # channel size of: bottleneck, skip4, 3, 2, 1
         size_dict = {
-            "unet": [],
+            "unet": [1024, 512, 256, 128, 64],
             "resnet50": [],
             "efficientnetb0": [320, 112, 40, 24, 16],
             "vgg19": [],
@@ -45,17 +50,16 @@ class UNet(nn.Module):
     
     def extract_features(model, input_tensor, layer_names):
         extracted_features = {}
-        cnt = 1
 
-        def hook(module, input, output):
-            nonlocal extracted_features, cnt
-            extracted_features[f"skip_{cnt}"] = output
-            cnt += 1
-
+        def register_hook(name):
+            def hook(module, input, output):
+                extracted_features[name] = output
+            return hook
+        
         hook_handles = []
         for name, module in model.named_modules():
             if name in layer_names:
-                hook_handles.append(module.register_forward_hook(hook))
+                hook_handles.append(module.register_forward_hook(register_hook(name)))
 
         model(input_tensor)
 
