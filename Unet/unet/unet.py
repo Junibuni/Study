@@ -6,10 +6,13 @@ from torchvision.models.feature_extraction import create_feature_extractor
 
 from . import network
 from .backbone import get_backbone
+from .losses import * #TODO
 
 class UNet(pl.LightningModule):
-    def __init__(self, in_channels=3, num_classes=5, backbone_name="unet"):
+    def __init__(self, in_channels=3, num_classes=5, backbone_name="unet", loss_fn="crossentropy"):
         super(UNet, self).__init__()
+        self.loss_fn = loss_fn
+
         self.backbone_name = backbone_name
         self.encoder = create_feature_extractor(get_backbone(backbone_name), self.layer)
 
@@ -75,3 +78,48 @@ class UNet(pl.LightningModule):
             handle.remove()
 
         return extracted_features"""
+    
+    def loss_function(self):
+        match self.loss_fn:
+            case "cross_entropy":
+                criterion = nn.CrossEntropyLoss()
+            case "miou":
+                #TODO: implement miou
+                pass
+            case "focal":
+                #TODO: implement focal
+                pass
+            case _:
+                raise NotImplementedError(f"{self.loss_fn} is not valid loss")
+        
+        return criterion
+
+    def training_step(self, train_batch, batch_idx):
+        data, target = train_batch
+
+        output = self.forward(data)
+        loss = self.loss_fn(output, target)
+        logs = {'train_loss': loss}
+
+        return {'loss': loss, 'log': logs}
+
+    def validation_step(self, val_batch, batch_idx):
+        data, target = val_batch
+
+        output = self.forward(data)
+        loss = self.loss_fn(output, target)
+
+        #TODO
+        pass
+
+    def validation_epoch_end(self, outputs):
+        #TODO
+        pass
+
+    def test_step(self, batch, batch_idx):
+        #TODO
+        pass
+
+    def test_epoch_end(self, outputs):
+        #TODO
+        pass
