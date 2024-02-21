@@ -2,13 +2,12 @@
 import os
 
 import torch
-from torch.utils.data import Dataset
-from torchvision import datasets
+from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms import transforms
 from torchvision.io import read_image
-from PIL import Image
+import torchvision.transforms.functional as TF
 from pycocotools.coco import COCO
-import matplotlib.pyplot as plt
+import lightning.pytorch as pl
 import numpy as np
 
 class MyCocoDataset(Dataset):
@@ -49,5 +48,59 @@ class MyCocoDataset(Dataset):
     
     def __len__(self):
         return len(self.imgIds)
+    
+    def poly_to_mask(cat_ids, masks):
+        pass
 
 #%%
+def my_collate_fn(batch):
+    images = [item[0] for item in batch]
+    max_height = max(img.size()[1] for img in images)
+    max_width = max(img.size()[0] for img in images)
+
+
+    pad_height = max_height - np.array([img.size()[1] for img in images])
+    pad_width = max_width - np.array([img.size()[0] for img in images])
+
+    h_quotient, h_remainder = divmod(pad_width, 2)
+    v_quotient, v_remainder = divmod(pad_height, 2)
+
+    pad_left = h_quotient
+    pad_right = h_quotient + h_remainder
+    pad_top = v_quotient
+    pad_bottom = v_quotient + v_remainder
+
+    padded_batch = []
+    for i, img in enumerate(batch):
+        padding = (pad_left[i], pad_top[i], pad_right[i], pad_bottom[i])
+        padded_img = TF.pad(img, padding, fill=0)
+        padded_batch.append(padded_img)
+
+    tensor_batch = [TF.to_tensor(img) for img in padded_batch]
+
+    return torch.stack(tensor_batch)
+
+dataloader_example = DataLoader(MyCocoDataset(r"C:\Users\CHOI\Documents\Study\Unet\datasets", "test"), batch_size = 2, collate_fn=my_collate_fn)
+for d in dataloader_example:
+    print(d)
+
+quit()
+
+class DataModule(pl.LightningDataModule):
+    def __init__(self, batch_size, dataset_root):
+        self.batch_size = batch_size
+        self.dataset_root = dataset_root
+
+    def setup(self):
+        self.train_set = MyCocoDataset(self.dataset_root, "train")
+        self.valid_set = MyCocoDataset(self.dataset_root, "valid")
+        self.test_set = MyCocoDataset(self.dataset_root, "test")
+
+    def train_dataloader(self):
+        return DataLoader(self.train_set, batch_size=self.batch_size, shuffle=True)
+    
+    def val_dataloader(self):
+        return DataLoader(self.valid_set, batch_size=self.batch_size)
+    
+    def test_dataloader(self):
+        return DataLoader(self.test_set, batch_size=self.batch_size)

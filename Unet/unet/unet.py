@@ -1,7 +1,7 @@
 # 백본 이랑 유넷을 연결시키는 다연결시켜서 full network
 import torch
 import torch.nn as nn
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 from torchvision.models.feature_extraction import create_feature_extractor
 
 from . import network
@@ -9,9 +9,9 @@ from .backbone import get_backbone
 from .losses import * #TODO
 
 class UNet(pl.LightningModule):
-    def __init__(self, in_channels=3, num_classes=5, backbone_name="unet", loss_fn="crossentropy"):
+    def __init__(self, *, optimizer, optim_params, in_channels=3, num_classes=5, backbone_name="unet", loss_fn="crossentropy"):
         super(UNet, self).__init__()
-        self.loss_fn = loss_fn
+        self.criterion = self.loss_function(loss_fn)
 
         self.backbone_name = backbone_name
         self.encoder = create_feature_extractor(get_backbone(backbone_name), self.layer)
@@ -21,6 +21,8 @@ class UNet(pl.LightningModule):
         self.module3 = network.Up(256, 128, self.size[3])
         self.module4 = network.Up(128, 64, self.size[4])
         self.final_module = network.FinalConv(64, num_classes)
+
+        self.save_hyperparameters()
 
     def forward(self, x):
         # Encoder
@@ -79,8 +81,8 @@ class UNet(pl.LightningModule):
 
         return extracted_features"""
     
-    def loss_function(self):
-        match self.loss_fn:
+    def loss_function(self, loss_fn):
+        match loss_fn:
             case "cross_entropy":
                 criterion = nn.CrossEntropyLoss()
             case "miou":
@@ -90,30 +92,34 @@ class UNet(pl.LightningModule):
                 #TODO: implement focal
                 pass
             case _:
-                raise NotImplementedError(f"{self.loss_fn} is not valid loss")
+                raise NotImplementedError(f"{loss_fn} is not valid loss")
         
         return criterion
 
-    def training_step(self, train_batch, batch_idx):
-        data, target = train_batch
+    def configure_optimizers(self):
+        assert self.hparams.optimzer and self.hparams.optim_params, "Optimizer not passed!"
+        optimizer = self.hparams.otimizer(self.parameters,**self.hparams.optim_params)
 
+        return optimizer
+    
+    def shared_step(self, data, target):
         output = self.forward(data)
-        loss = self.loss_fn(output, target)
-        logs = {'train_loss': loss}
+        loss = self.criterion(output, target)
 
-        return {'loss': loss, 'log': logs}
+        return loss
+    
+    def training_step(self, train_batch, batch_idx):
+        loss = self.shared_step(*train_batch)
+        self.log({'step_train_loss': loss})
+
+        return loss
 
     def validation_step(self, val_batch, batch_idx):
-        data, target = val_batch
+        loss = self.shared_step(*val_batch)
+        self.log({'step_val_loss': loss})
 
-        output = self.forward(data)
-        loss = self.loss_fn(output, target)
-
-        #TODO
-        pass
-
-    def validation_epoch_end(self, outputs):
-        #TODO
+    def on_validation_epoch_end(self):
+        # cunstom metric
         pass
 
     def test_step(self, batch, batch_idx):
