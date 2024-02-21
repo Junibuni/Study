@@ -1,4 +1,3 @@
-# 백본 이랑 유넷을 연결시키는 다연결시켜서 full network
 import torch
 import torch.nn as nn
 import lightning.pytorch as pl

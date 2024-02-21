@@ -85,7 +85,7 @@ def collate_fn(batch):
     return list(zip(padded_images, padded_masks))
 
 class DataModule(pl.LightningDataModule):
-    def __init__(self, batch_size, dataset_root):
+    def __init__(self, *, dataset_root, batch_size):
         self.batch_size = batch_size
         self.dataset_root = dataset_root
 
