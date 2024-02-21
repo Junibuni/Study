@@ -25,14 +25,9 @@ class MyCocoDataset(Dataset):
         imageId = self.imgIds[index]
         annIds = self.coco.getAnnIds(imgIds = imageId)
         anns = self.coco.loadAnns(annIds)
-
-        masks = list()
-        categories = list()
-        for an in anns:
-            masks.append(torch.tensor(self.coco.annToMask(an), dtype=torch.int64))
-            categories.append(an["category_id"])
         
         imageInfo = self.coco.loadImgs(imageId)[0]
+        mask = self.poly_to_mask(imageInfo, anns)
 
         # CHW, RGB, in tensor form
         img = read_image(os.path.join(self.root, self.split, imageInfo['file_name'])).float()
@@ -44,20 +39,25 @@ class MyCocoDataset(Dataset):
         ])
 
         img = preprocess(img)
-        return img, dict(mask=masks, category_id=categories)
+        return img, mask
     
     def __len__(self):
         return len(self.imgIds)
     
-    def poly_to_mask(cat_ids, masks):
-        pass
+    def poly_to_mask(self, img_info, anns):
+        anns_img = np.zeros((img_info['height'],img_info['width']))
+        for ann in anns:
+            anns_img = np.maximum(anns_img, self.coco.annToMask(ann)*ann['category_id'])
+        
+        return torch.tensor(anns_img, dtype=torch.int64)
 
 #%%
-def my_collate_fn(batch):
+def collate_fn(batch):
     images = [item[0] for item in batch]
+    masks = [item[1] for item in batch]
+
     max_height = max(img.size()[1] for img in images)
     max_width = max(img.size()[0] for img in images)
-
 
     pad_height = max_height - np.array([img.size()[1] for img in images])
     pad_width = max_width - np.array([img.size()[0] for img in images])
@@ -70,21 +70,19 @@ def my_collate_fn(batch):
     pad_top = v_quotient
     pad_bottom = v_quotient + v_remainder
 
-    padded_batch = []
-    for i, img in enumerate(batch):
+    padded_images = []
+    padded_masks = []
+
+    for i, image_mask in enumerate(zip(images, masks)):
+        img, mask = image_mask
         padding = (pad_left[i], pad_top[i], pad_right[i], pad_bottom[i])
         padded_img = TF.pad(img, padding, fill=0)
-        padded_batch.append(padded_img)
+        padded_mask = TF.pad(mask, padding, fill=0)
 
-    tensor_batch = [TF.to_tensor(img) for img in padded_batch]
+        padded_images.append(padded_img)
+        padded_masks.append(padded_mask)
 
-    return torch.stack(tensor_batch)
-
-dataloader_example = DataLoader(MyCocoDataset(r"C:\Users\CHOI\Documents\Study\Unet\datasets", "test"), batch_size = 2, collate_fn=my_collate_fn)
-for d in dataloader_example:
-    print(d)
-
-quit()
+    return list(zip(padded_images, padded_masks))
 
 class DataModule(pl.LightningDataModule):
     def __init__(self, batch_size, dataset_root):
@@ -97,10 +95,11 @@ class DataModule(pl.LightningDataModule):
         self.test_set = MyCocoDataset(self.dataset_root, "test")
 
     def train_dataloader(self):
-        return DataLoader(self.train_set, batch_size=self.batch_size, shuffle=True)
+        return DataLoader(self.train_set, batch_size=self.batch_size, collate_fn=collate_fn, shuffle=True)
     
     def val_dataloader(self):
-        return DataLoader(self.valid_set, batch_size=self.batch_size)
+        return DataLoader(self.valid_set, batch_size=self.batch_size, collate_fn=collate_fn)
     
     def test_dataloader(self):
-        return DataLoader(self.test_set, batch_size=self.batch_size)
+        return DataLoader(self.test_set, batch_size=self.batch_size, collate_fn=collate_fn)
+# %%
