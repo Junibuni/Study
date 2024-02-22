@@ -52,18 +52,25 @@ class MyCocoDataset(Dataset):
         return torch.tensor(anns_img, dtype=torch.int64)
 
 #%%
+def torch_divmod(dividend:torch.Tensor, divisor:int):
+    quotient = dividend.div(divisor, rounding_mode="floor")
+    remainder = torch.remainder(dividend, divisor)
+    return quotient, remainder
+
 def collate_fn(batch):
-    images = [item[0] for item in batch]
-    masks = [item[1] for item in batch]
+    images, masks = zip(*batch)
+
+    # images = np.array(images)
+    # masks = np.array(masks)
 
     max_height = max(img.size()[1] for img in images)
     max_width = max(img.size()[0] for img in images)
 
-    pad_height = max_height - np.array([img.size()[1] for img in images])
-    pad_width = max_width - np.array([img.size()[0] for img in images])
+    pad_height = max_height - torch.tensor([img.size()[1] for img in images])
+    pad_width = max_width - torch.tensor([img.size()[0] for img in images])
 
-    h_quotient, h_remainder = divmod(pad_width, 2)
-    v_quotient, v_remainder = divmod(pad_height, 2)
+    h_quotient, h_remainder = torch_divmod(pad_width, 2)
+    v_quotient, v_remainder = torch_divmod(pad_height, 2)
 
     pad_left = h_quotient
     pad_right = h_quotient + h_remainder
@@ -82,24 +89,33 @@ def collate_fn(batch):
         padded_images.append(padded_img)
         padded_masks.append(padded_mask)
 
-    return list(zip(padded_images, padded_masks))
+    return torch.stack(padded_images), torch.stack(padded_masks)
 
 class DataModule(pl.LightningDataModule):
     def __init__(self, *, dataset_root, batch_size):
+        super().__init__()
         self.batch_size = batch_size
         self.dataset_root = dataset_root
 
-    def setup(self):
+    def prepare_data(self):
+        MyCocoDataset(self.dataset_root, "train")
+        MyCocoDataset(self.dataset_root, "valid")
+        MyCocoDataset(self.dataset_root, "test")
+    
+    # def prepare_data_per_node(self):
+    #     self.prepare_data()
+
+    def setup(self, stage):
         self.train_set = MyCocoDataset(self.dataset_root, "train")
         self.valid_set = MyCocoDataset(self.dataset_root, "valid")
         self.test_set = MyCocoDataset(self.dataset_root, "test")
 
     def train_dataloader(self):
-        return DataLoader(self.train_set, batch_size=self.batch_size, collate_fn=collate_fn, shuffle=True)
+        return DataLoader(self.train_set, batch_size=self.batch_size, collate_fn=collate_fn, shuffle=True, num_workers=4, pin_memory=True, persistent_workers=True)
     
     def val_dataloader(self):
-        return DataLoader(self.valid_set, batch_size=self.batch_size, collate_fn=collate_fn)
+        return DataLoader(self.valid_set, batch_size=self.batch_size, collate_fn=collate_fn, num_workers=4, pin_memory=True, persistent_workers=True)
     
     def test_dataloader(self):
-        return DataLoader(self.test_set, batch_size=self.batch_size, collate_fn=collate_fn)
+        return DataLoader(self.test_set, batch_size=self.batch_size, collate_fn=collate_fn, num_workers=4, pin_memory=True, persistent_workers=True)
 # %%

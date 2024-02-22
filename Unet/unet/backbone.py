@@ -19,6 +19,8 @@ def get_backbone(backbone_name):
         backbone, pretrained_weight = model_loaders[backbone_name]
         if pretrained_weight:
             backbone = backbone(weights=pretrained_weight.DEFAULT)
+        else:
+            backbone = backbone()
     else:
         raise NotImplementedError(f"{backbone_name} is not available")
     

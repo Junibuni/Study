@@ -15,18 +15,9 @@ class FocalLoss(nn.Module):
         pt = torch.exp(-ce_loss)
         focal_loss = (1 - pt) ** self.gamma * ce_loss
 
-        if self.alpha is not None:
-            if isinstance(self.alpha, float):
-                pass
-            elif isinstance(self.alpha, np.ndarray):
-                alpha = torch.from_numpy(self.alpha)
-                alpha = alpha.view(-1, len(alpha), 1, 1).expand_as(input)
-            elif isinstance(alpha, torch.Tensor):
-                alpha = alpha.view(-1, len(alpha), 1, 1).expand_as(input)   
+        alpha = self.alpha[targets.data.view(-1)]
 
-            alpha = self.alpha[targets.data.view(-1)]
-
-            focal_loss = focal_loss * alpha
+        focal_loss = focal_loss * alpha
 
         if self.reduction == 'mean':
             return focal_loss.mean()
@@ -34,3 +25,32 @@ class FocalLoss(nn.Module):
             return focal_loss.sum()
         else:
             return focal_loss
+
+class MeanIoU(nn.Module):
+    def __init__(self, num_classes):
+        super(MeanIoU, self).__init__()
+        self.num_classes = num_classes
+        self.intersection = torch.zeros(num_classes)
+        self.union = torch.zeros(num_classes)
+        
+    def reset(self):
+        self.intersection.zero_()
+        self.union.zero_()
+
+    def update(self, y_true, y_pred):
+        for cls in range(self.num_classes):
+            intersection = torch.sum((y_true == cls) & (y_pred == cls))
+            union = torch.sum((y_true == cls) | (y_pred == cls))
+            self.intersection[cls] += intersection.item()
+            self.union[cls] += union.item()
+
+    def compute_iou(self):
+        class_iou = self.intersection / self.union
+        return class_iou
+
+    def forward(self, y_true, y_pred):
+        self.reset()
+        self.update(y_true, y_pred)
+        class_iou = self.compute_iou()
+        mean_iou = torch.mean(class_iou)
+        return mean_iou

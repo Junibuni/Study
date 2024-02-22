@@ -5,11 +5,13 @@ from torchvision.models.feature_extraction import create_feature_extractor
 
 from . import network
 from .backbone import get_backbone
-from .losses import * #TODO
+from .losses import FocalLoss, MeanIoU
 
 class UNet(pl.LightningModule):
-    def __init__(self, *, optimizer, optim_params, in_channels=3, num_classes=5, backbone_name="unet", loss_fn="crossentropy"):
+    def __init__(self, *, optimizer, optim_params, criterion_params, in_channels=3, num_classes=5, backbone_name="unet", loss_fn="crossentropy"):
         super(UNet, self).__init__()
+        self.save_hyperparameters()
+
         self.criterion = self.loss_function(loss_fn)
 
         self.backbone_name = backbone_name
@@ -20,8 +22,6 @@ class UNet(pl.LightningModule):
         self.module3 = network.Up(256, 128, self.size[3])
         self.module4 = network.Up(128, 64, self.size[4])
         self.final_module = network.FinalConv(64, num_classes)
-
-        self.save_hyperparameters()
 
     def forward(self, x):
         # Encoder
@@ -82,22 +82,20 @@ class UNet(pl.LightningModule):
     
     def loss_function(self, loss_fn):
         match loss_fn:
-            case "cross_entropy":
-                criterion = nn.CrossEntropyLoss()
+            case "crossentropy":
+                criterion = nn.CrossEntropyLoss(**self.hparams.criterion_params)
             case "miou":
-                #TODO: implement miou
-                pass
+                criterion = MeanIoU(**self.hparams.criterion_params)
             case "focal":
-                #TODO: implement focal
-                pass
+                criterion = FocalLoss(**self.hparams.criterion_params)
             case _:
                 raise NotImplementedError(f"{loss_fn} is not valid loss")
         
         return criterion
 
     def configure_optimizers(self):
-        assert self.hparams.optimzer and self.hparams.optim_params, "Optimizer not passed!"
-        optimizer = self.hparams.otimizer(self.parameters,**self.hparams.optim_params)
+        assert self.hparams.optimizer and self.hparams.optim_params, "Optimizer not passed!"
+        optimizer = self.hparams.optimizer(self.parameters(),**self.hparams.optim_params)
 
         return optimizer
     
@@ -109,13 +107,13 @@ class UNet(pl.LightningModule):
     
     def training_step(self, train_batch, batch_idx):
         loss = self.shared_step(*train_batch)
-        self.log({'step_train_loss': loss})
+        self.log_dict({'step_train_loss': loss})
 
         return loss
 
     def validation_step(self, val_batch, batch_idx):
         loss = self.shared_step(*val_batch)
-        self.log({'step_val_loss': loss})
+        self.log_dict({'step_val_loss': loss})
 
     def on_validation_epoch_end(self):
         # cunstom metric

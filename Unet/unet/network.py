@@ -12,7 +12,7 @@ class DoubleConv(nn.Module):
             nn.BatchNorm2d(mid_channel),
             nn.ReLU(),
             nn.Conv2d(mid_channel, out_channel, kernel_size=kernel_size, padding=1, bias=False),
-            nn.BatchNorm2d(),
+            nn.BatchNorm2d(out_channel),
             nn.ReLU()
         )
     
@@ -28,7 +28,7 @@ class Down(nn.Module):
             DoubleConv(in_channel, out_channel)
         )
     
-    def __forward__(self, x):
+    def forward(self, x):
         return self.up_double_conv(x)
     
 class Up(nn.Module):
