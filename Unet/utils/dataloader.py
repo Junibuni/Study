@@ -45,11 +45,11 @@ class MyCocoDataset(Dataset):
         return len(self.imgIds)
     
     def poly_to_mask(self, img_info, anns):
-        anns_img = np.zeros((img_info['height'],img_info['width']))
+        anns_img = torch.zeros((img_info['height'],img_info['width']))
         for ann in anns:
-            anns_img = np.maximum(anns_img, self.coco.annToMask(ann)*ann['category_id'])
+            anns_img = torch.maximum(anns_img, self.coco.annToMask(ann)*ann['category_id'])
         
-        return torch.tensor(anns_img, dtype=torch.int64)
+        return anns_img.to(torch.int64)
 
 #%%
 def torch_divmod(dividend:torch.Tensor, divisor:int):
@@ -59,9 +59,6 @@ def torch_divmod(dividend:torch.Tensor, divisor:int):
 
 def collate_fn(batch):
     images, masks = zip(*batch)
-
-    # images = np.array(images)
-    # masks = np.array(masks)
 
     max_height = max(img.size()[1] for img in images)
     max_width = max(img.size()[0] for img in images)
@@ -101,9 +98,6 @@ class DataModule(pl.LightningDataModule):
         MyCocoDataset(self.dataset_root, "train")
         MyCocoDataset(self.dataset_root, "valid")
         MyCocoDataset(self.dataset_root, "test")
-    
-    # def prepare_data_per_node(self):
-    #     self.prepare_data()
 
     def setup(self, stage):
         self.train_set = MyCocoDataset(self.dataset_root, "train")
