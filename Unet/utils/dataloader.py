@@ -44,12 +44,18 @@ class MyCocoDataset(Dataset):
     def __len__(self):
         return len(self.imgIds)
     
-    def poly_to_mask(self, img_info, anns):
-        anns_img = torch.zeros((img_info['height'],img_info['width']))
-        for ann in anns:
-            anns_img = torch.maximum(anns_img, self.coco.annToMask(ann)*ann['category_id'])
-        
-        return anns_img.to(torch.int64)
+    def poly_to_mask(self, img_info, anns, merge=True):
+        if merge:
+            anns_img = np.zeros((img_info['height'],img_info['width']))
+            for ann in anns:
+                anns_img = np.maximum(anns_img, self.coco.annToMask(ann)*ann['category_id'])
+            return torch.tensor(anns_img, dtype=torch.int64)
+        else:
+            mask = torch.zeros((len(self.catIds), img_info['height'],img_info['width']), dtype=torch.int64)
+            for ann in anns:
+                mask[ann["category_id"]] = torch.Tensor(self.coco.annToMask(ann))
+            return mask.to(torch.int64)
+            
 
 #%%
 def torch_divmod(dividend:torch.Tensor, divisor:int):

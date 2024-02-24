@@ -1,5 +1,10 @@
-import torch
 import torch.nn as nn
+from torchmetrics.classification import (Dice,
+                                         MulticlassF1Score,
+                                         MulticlassAccuracy,
+                                         MulticlassPrecision,
+                                         MulticlassRecall,
+                                         MulticlassJaccardIndex,)
 import lightning.pytorch as pl
 from torchvision.models.feature_extraction import create_feature_extractor
 
@@ -12,7 +17,10 @@ class UNet(pl.LightningModule):
         super(UNet, self).__init__()
         self.save_hyperparameters()
 
+        self.validation_step_outputs = []
         self.criterion = self.loss_function(loss_fn)
+        self.metrics = ["dice", "f1", "acc", "precision", "recall", "jaccard"]
+        self._init_metrics({"num_classes": num_classes})
 
         self.backbone_name = backbone_name
         self.encoder = create_feature_extractor(get_backbone(backbone_name), self.layer)
@@ -36,6 +44,7 @@ class UNet(pl.LightningModule):
         x = self.module3(x, features[layer.pop()])
         x = self.module4(x, features[layer.pop()])
         out = self.final_module(x)
+
         return out
     
     @property
@@ -103,26 +112,51 @@ class UNet(pl.LightningModule):
         output = self.forward(data)
         loss = self.criterion(output, target)
 
-        return loss
+        return loss, output, target
     
     def training_step(self, train_batch, batch_idx):
-        loss = self.shared_step(*train_batch)
+        loss, _, _ = self.shared_step(*train_batch)
         self.log_dict({'step_train_loss': loss})
 
         return loss
 
     def validation_step(self, val_batch, batch_idx):
-        loss = self.shared_step(*val_batch)
+        loss, y_hat, y = self.shared_step(*val_batch)
         self.log_dict({'step_val_loss': loss})
 
+        self._accumulate_metrics(y, y_hat)
+         
+        return loss
+
     def on_validation_epoch_end(self):
-        # cunstom metric
-        pass
+        metrics = self._metrics()
+        for name, val in metrics.items():
+            self.log(f"valid-{name}", val)
 
-    def test_step(self, batch, batch_idx):
-        #TODO
-        pass
+        self._reset_metrics()
+    
+    def _init_metrics(self, metric_kwargs={}):
+        self.dice = Dice(**metric_kwargs)
+        self.f1 = MulticlassF1Score(**metric_kwargs)
+        self.acc = MulticlassAccuracy(**metric_kwargs)
+        self.precision = MulticlassPrecision(**metric_kwargs)
+        self.recall = MulticlassRecall(**metric_kwargs)
+        self.jaccard = MulticlassJaccardIndex(**metric_kwargs)
 
-    def test_epoch_end(self, outputs):
-        #TODO
-        pass
+    def _accumulate_metrics(self, y, y_hat):
+        for metric in self.metrics:
+            getattr(self, metric)(y_hat, y)
+    
+    def _reset_metrics(self):
+        for metric in self.metrics:
+            getattr(self, metric).reset()
+        
+    def _metrics(self):
+        return {
+            "dice": self.dice.compute(),
+            "f1": self.f1.compute(),
+            "acc": self.acc.compute(),
+            "precision": self.precision.compute(),
+            "recall": self.recall.compute(),
+            "jaccard": self.jaccard.compute(),
+        }
