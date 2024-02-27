@@ -1,4 +1,6 @@
+import torch
 import torch.nn as nn
+import torchvision
 from torchmetrics.classification import (Dice,
                                          MulticlassF1Score,
                                          MulticlassAccuracy,
@@ -49,24 +51,36 @@ class UNet(pl.LightningModule):
     
     @property
     def layer(self):
-        # skip1, skip2, skip3, skip4, bottleneck
+        #skip1, skip2, skip3, skip4, bottleneck
         layer_concat = {
             "unet": ["module1", "module2", "module3", "module4", "module5"],
             "resnet50": ["relu", "layer1", "layer2", "layer3", "layer4"],
             "efficientnetb0": ["features.1", "features.2", "features.3", "features.5", "features.7"],
             "vgg19": ["12", "25", "38", "51", "52"],
         }
+        # layer_concat = {
+        #     "unet": ["module1", "module2", "module3", "module4"],
+        #     "resnet50": ["relu", "layer1", "layer2", "layer3"],
+        #     "efficientnetb0": ["features.1", "features.2", "features.3", "features.5"],
+        #     "vgg19": ["12", "25", "38", "51"],
+        # }
         return layer_concat[self.backbone_name].copy()
     
     @property
     def size(self):
-        # channel size of: bottleneck, skip4, 3, 2, 1
+        #channel size of: bottleneck, skip4, 3, 2, 1
         size_dict = {
             "unet": [1024, 512, 256, 128, 64],
             "resnet50": [2048, 1024, 512, 256, 64],
             "efficientnetb0": [320, 112, 40, 24, 16],
             "vgg19": [512, 512, 512, 256, 128],
         }
+        # size_dict = {
+        #     "unet": [512, 256, 128, 64],
+        #     "resnet50": [1024, 512, 256, 64],
+        #     "efficientnetb0": [112, 40, 24, 16],
+        #     "vgg19": [512, 512, 256, 128],
+        # }
         return size_dict[self.backbone_name].copy()
     
     """def extract_features(model, input_tensor, layer_names):
@@ -125,8 +139,39 @@ class UNet(pl.LightningModule):
         self.log_dict({'step_val_loss': loss})
 
         self._accumulate_metrics(y, y_hat)
-         
+
+        y_hat = torch.argmax(y_hat, dim=1)
+        batch_torch = []
+        if batch_idx % 10 == 0:
+            orig_image = self.unnormalize(val_batch[0])
+            class_colors = torch.tensor([(0, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 0), (1, 1, 0)], device=orig_image.device)
+            class_colors = class_colors.unsqueeze(-1)
+            for index, mask in enumerate([y, y_hat]):
+                for i, m in zip(orig_image, mask):
+                    classes = m.unique()
+                    classes = classes[classes>0].int()
+                    for cls_idx in classes:
+                        match = (m == cls_idx).nonzero()
+
+                        i[:, match[:,0], match[:,1]] = i[:, match[:,0], match[:,1]] * 0.5 + class_colors[cls_idx] * 0.5
+                    batch_torch.append(i)
+                out = torch.stack(batch_torch, dim=0)
+                grid_input = torchvision.utils.make_grid(out, nrow=2)
+                for logger in self.trainer.loggers:
+                    if isinstance(logger, pl.loggers.tensorboard.TensorBoardLogger):
+                        logger.experiment.add_image('Original mask' if index == 0 else 'Predicted mask', grid_input, self.current_epoch)
+                            
         return loss
+
+    def unnormalize(self, tensor):
+        mean = [0.5735, 0.5618, 0.5681]
+        std = [0.2341, 0.2348, 0.2343]
+
+        copy_tensor = tensor.clone()
+        for i in range(copy_tensor.shape[1]):
+            copy_tensor[:, i] = copy_tensor[:, i] * std[i] + mean[i]
+
+        return copy_tensor
 
     def on_validation_epoch_end(self):
         metrics = self._metrics()
@@ -152,11 +197,4 @@ class UNet(pl.LightningModule):
             getattr(self, metric).reset()
         
     def _metrics(self):
-        return {
-            "dice": self.dice.compute(),
-            "f1": self.f1.compute(),
-            "acc": self.acc.compute(),
-            "precision": self.precision.compute(),
-            "recall": self.recall.compute(),
-            "jaccard": self.jaccard.compute(),
-        }
+        return {metric: getattr(self, metric).compute() for metric in self.metrics}
