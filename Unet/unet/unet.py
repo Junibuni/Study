@@ -9,8 +9,10 @@ from torchmetrics.classification import (Dice,
                                          MulticlassJaccardIndex,)
 import lightning.pytorch as pl
 from torchvision.models.feature_extraction import create_feature_extractor
+import numpy as np
 
 from . import network
+from .utils import add_mask
 from .backbone import get_backbone
 from .losses import FocalLoss, MeanIoU
 
@@ -32,6 +34,9 @@ class UNet(pl.LightningModule):
         self.module3 = network.Up(256, 128, self.size[3])
         self.module4 = network.Up(128, 64, self.size[4])
         self.final_module = network.FinalConv(64, num_classes)
+
+        self.img_stack_original = []
+        self.img_stack_predicted = []
 
     def forward(self, x):
         # Encoder
@@ -136,31 +141,25 @@ class UNet(pl.LightningModule):
 
     def validation_step(self, val_batch, batch_idx):
         loss, y_hat, y = self.shared_step(*val_batch)
+        self.batch_size = len(val_batch[0])
         self.log_dict({'step_val_loss': loss})
 
         self._accumulate_metrics(y, y_hat)
 
         y_hat = torch.argmax(y_hat, dim=1)
-        batch_torch = []
-        if batch_idx % 10 == 0:
-            orig_image = self.unnormalize(val_batch[0])
-            class_colors = torch.tensor([(0, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 0), (1, 1, 0)], device=orig_image.device)
+        
+        if batch_idx % 20 == 0:
+            orig_images = self.unnormalize(val_batch[0])
+            class_colors = torch.tensor([(0, 0, 0), (0, 1, 0), (0, 0, 1), (1, 0, 0), (1, 1, 0)], device=orig_images.device)
             class_colors = class_colors.unsqueeze(-1)
-            for index, mask in enumerate([y, y_hat]):
-                for i, m in zip(orig_image, mask):
-                    classes = m.unique()
-                    classes = classes[classes>0].int()
-                    for cls_idx in classes:
-                        match = (m == cls_idx).nonzero()
 
-                        i[:, match[:,0], match[:,1]] = i[:, match[:,0], match[:,1]] * 0.5 + class_colors[cls_idx] * 0.5
-                    batch_torch.append(i)
-                out = torch.stack(batch_torch, dim=0)
-                grid_input = torchvision.utils.make_grid(out, nrow=2)
-                for logger in self.trainer.loggers:
-                    if isinstance(logger, pl.loggers.tensorboard.TensorBoardLogger):
-                        logger.experiment.add_image('Original mask' if index == 0 else 'Predicted mask', grid_input, self.current_epoch)
-                            
+            for image, gt_mask, dt_mask in zip(orig_images, y, y_hat):
+                gt_image = add_mask(image.clone(), gt_mask, class_colors)
+                dt_image = add_mask(image.clone(), dt_mask, class_colors)
+
+                self.img_stack_original.append(gt_image)
+                self.img_stack_predicted.append(dt_image)
+   
         return loss
 
     def unnormalize(self, tensor):
@@ -179,7 +178,17 @@ class UNet(pl.LightningModule):
             self.log(f"valid-{name}", val)
 
         self._reset_metrics()
-    
+
+        grid_original = torchvision.utils.make_grid(self.img_stack_original, nrow=self.batch_size)
+        grid_predicted = torchvision.utils.make_grid(self.img_stack_predicted, nrow=self.batch_size)
+        for logger in self.trainer.loggers:
+            if isinstance(logger, pl.loggers.tensorboard.TensorBoardLogger):
+                logger.experiment.add_image('Original mask', grid_original, self.global_step)
+                logger.experiment.add_image('Predicted mask', grid_predicted, self.global_step)
+
+        self.img_stack_original = []
+        self.img_stack_predicted = []
+
     def _init_metrics(self, metric_kwargs={}):
         self.dice = Dice(**metric_kwargs)
         self.f1 = MulticlassF1Score(**metric_kwargs)
