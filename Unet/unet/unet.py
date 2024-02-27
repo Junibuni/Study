@@ -27,13 +27,25 @@ class UNet(pl.LightningModule):
         self._init_metrics({"num_classes": num_classes})
 
         self.backbone_name = backbone_name
-        self.encoder = create_feature_extractor(get_backbone(backbone_name), self.layer)
+        self.encoder = create_feature_extractor(get_backbone(self.backbone_name), self.layer)
 
+        last_channel = 64
         self.module1 = network.Up(self.size[0], 512, self.size[1])
         self.module2 = network.Up(512, 256, self.size[2])
         self.module3 = network.Up(256, 128, self.size[3])
-        self.module4 = network.Up(128, 64, self.size[4])
-        self.final_module = network.FinalConv(64, num_classes)
+        self.module4 = network.Up(128, last_channel, self.size[4])
+        self.additional_module = nn.Identity()
+
+        
+        if "unet" not in self.backbone_name:
+            last_channel = 32
+            self.additional_module = nn.Sequential([
+                nn.ConvTranspose2d(64, last_channel, kernel_size=2, stride=2), # double up channel
+                network.DoubleConv(last_channel, 16)
+            ])
+            last_channel = 16
+            
+        self.final_module = network.FinalConv(last_channel, num_classes)
 
         self.img_stack_original = []
         self.img_stack_predicted = []
@@ -63,12 +75,6 @@ class UNet(pl.LightningModule):
             "efficientnetb0": ["features.1", "features.2", "features.3", "features.5", "features.7"],
             "vgg19": ["12", "25", "38", "51", "52"],
         }
-        # layer_concat = {
-        #     "unet": ["module1", "module2", "module3", "module4"],
-        #     "resnet50": ["relu", "layer1", "layer2", "layer3"],
-        #     "efficientnetb0": ["features.1", "features.2", "features.3", "features.5"],
-        #     "vgg19": ["12", "25", "38", "51"],
-        # }
         return layer_concat[self.backbone_name].copy()
     
     @property
@@ -80,12 +86,6 @@ class UNet(pl.LightningModule):
             "efficientnetb0": [320, 112, 40, 24, 16],
             "vgg19": [512, 512, 512, 256, 128],
         }
-        # size_dict = {
-        #     "unet": [512, 256, 128, 64],
-        #     "resnet50": [1024, 512, 256, 64],
-        #     "efficientnetb0": [112, 40, 24, 16],
-        #     "vgg19": [512, 512, 256, 128],
-        # }
         return size_dict[self.backbone_name].copy()
     
     """def extract_features(model, input_tensor, layer_names):

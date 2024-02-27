@@ -21,6 +21,8 @@ def get_backbone(backbone_name):
             backbone = backbone(weights=pretrained_weight.DEFAULT)
         else:
             backbone = backbone()
+        if "vgg" in backbone_name:
+            backbone = backbone.features
     else:
         raise NotImplementedError(f"{backbone_name} is not available")
     
@@ -48,13 +50,14 @@ class UNetEncoder(nn.Module):
 if __name__ == "__main__":
     from torchvision.models.feature_extraction import create_feature_extractor
     from torchsummary import summary
-    backbone_name = "resnet50"
+    backbone_name = "vgg19"
     layer_concat = {
             "unet": ["module1", "module2", "module3", "module4", "module5"],
             "resnet50": ["relu", "layer1", "layer2", "layer3", "layer4"],
             "efficientnetb0": ["features.1", "features.2", "features.3", "features.5", "features.7"],
             "vgg19": ["12", "25", "38", "51", "52"],
         }
+    print(get_backbone(backbone_name))
     encoder = create_feature_extractor(get_backbone(backbone_name).to("cuda"), layer_concat[backbone_name])
 
     print(summary(encoder, input_size=(3, 640, 640)))

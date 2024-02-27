@@ -34,7 +34,7 @@ class Down(nn.Module):
 class Up(nn.Module):
     def __init__(self, in_channel, out_channel, concat_channel):
         super(Up, self).__init__()
-        self.up_conv = nn.ConvTranspose2d(in_channel, out_channel, kernel_size=2, stride=2) # halves out channel
+        self.up_conv = nn.ConvTranspose2d(in_channel, out_channel, kernel_size=2, stride=2) # double channel
         self.double_conv = DoubleConv(out_channel+concat_channel, out_channel)
 
     def forward(self, x, in_feature):

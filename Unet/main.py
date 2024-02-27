@@ -21,13 +21,13 @@ def argument_parser():
     parser.add_argument("--device", default="gpu", type=str)
     parser.add_argument("--precision", default="16-mixed", type=str)
     parser.add_argument("--loss_fn", default="crossentropy", type=str)
-    parser.add_argument("--max_train_batch", default=0.05, type=float)
+    parser.add_argument("--max_train_batch", default=1, type=float)
     parser.add_argument("--version_name", default="test", type=str)
     parser.add_argument("--backbone", default="unet", type=str)
     parser.add_argument("--max_epochs", default=300, type=int)
     parser.add_argument("--log_step", default=10, type=int)
     parser.add_argument("--continue_train", default=False, type=bool)
-    parser.add_argument("--continue_pth", default=r"C:\Users\CHOI\Documen ts\Study\Unet\logs\unet\test\checkpoints\epoch=87-step=37752.ckpt", type=str)
+    parser.add_argument("--continue_pth", default=r"", type=str)
 
     parser.add_argument("--seed", default=42, type=int, dest="seed")
 
@@ -43,11 +43,10 @@ def main(args):
                       accelerator=args.device, 
                       devices=[0],
                       precision=args.precision, 
-                    #   limit_train_batches=args.max_train_batch,
+                      limit_train_batches=args.max_train_batch,
                       num_sanity_val_steps=0, 
                       log_every_n_steps=args.log_step,
                       max_epochs=args.max_epochs,
-                      overfit_batches=0.1
                       )
     
     print("Initialize DataModule")
