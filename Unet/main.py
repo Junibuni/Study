@@ -5,6 +5,7 @@ import torch
 from lightning.pytorch import seed_everything
 from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
+from lightning.pytorch.callbacks import LearningRateMonitor
 
 from unet.dataloader import DataModule
 from unet.unet import UNet
@@ -15,16 +16,14 @@ def argument_parser():
     parser.add_argument("--mode", default="train", choices=["train", "test"], type=str)
     parser.add_argument("--lr", default=1e-4, type=float)
     parser.add_argument("--batch_size", default=4, type=int)
-    parser.add_argument("--num_epoch", default=100, type=int)
+    parser.add_argument("--num_epoch", default=50, type=int)
     parser.add_argument("--dataset_pth", default="Unet\datasets", type=str)
     parser.add_argument("--log_pth", default="Unet\logs", type=str)
     parser.add_argument("--device", default="gpu", type=str)
     parser.add_argument("--precision", default="16-mixed", type=str)
-    parser.add_argument("--loss_fn", default="crossentropy", type=str)
-    parser.add_argument("--max_train_batch", default=1, type=float)
-    parser.add_argument("--version_name", default="test", type=str)
-    parser.add_argument("--backbone", default="unet", type=str)
-    parser.add_argument("--max_epochs", default=300, type=int)
+    parser.add_argument("--loss_fn", default="focal", type=str)
+    parser.add_argument("--max_train_batch", default=1.0, type=float)
+    parser.add_argument("--backbone", default="resnet50", choices=["unet", "resnet50", "efficientnetb0", "vgg19"], type=str)
     parser.add_argument("--log_step", default=10, type=int)
     parser.add_argument("--continue_train", default=False, type=bool)
     parser.add_argument("--continue_pth", default=r"", type=str)
@@ -34,10 +33,16 @@ def argument_parser():
     return parser.parse_args()
 
 def main(args):
+    torch.set_float32_matmul_precision("medium")
     seed_everything(args.seed)
+
     print(f"Loading Loggers")
-    csv_logger = CSVLogger(args.log_pth, name=os.path.join(args.backbone, "CSVLogger"))
-    tb_logger = TensorBoardLogger(save_dir=args.log_pth, name=os.path.join(args.backbone, "TBLogger"))
+    version_name = f"lr_{args.lr:.0e}_{args.loss_fn}_lrscheduled_gamma5"
+    csv_logger = CSVLogger(args.log_pth, name=os.path.join(args.backbone, "CSVLogger"), version=version_name)
+    tb_logger = TensorBoardLogger(save_dir=args.log_pth, name=os.path.join(args.backbone, "TBLogger"), version=version_name)
+
+    
+    lr_monitor = LearningRateMonitor(logging_interval='step')
 
     trainer = Trainer(logger=[csv_logger, tb_logger], 
                       accelerator=args.device, 
@@ -46,7 +51,8 @@ def main(args):
                       limit_train_batches=args.max_train_batch,
                       num_sanity_val_steps=0, 
                       log_every_n_steps=args.log_step,
-                      max_epochs=args.max_epochs,
+                      max_epochs=args.num_epoch,
+                      callbacks=[lr_monitor]
                       )
     
     print("Initialize DataModule")
@@ -56,14 +62,16 @@ def main(args):
         optimizer = torch.optim.Adam,
         optim_params = dict(lr=args.lr, betas=(0.9, 0.999), weight_decay=1e-4),
         loss_fn = args.loss_fn,
-        criterion_params = {}, 
+        criterion_params = {"alpha": [0.10439873, 0.3914727, 0.54425207, 0.64198122, 0.35707117],
+                            "gamma": 5}, 
         backbone_name = args.backbone
     )
-
+    """"alpha": [0.10439873, 0.3914727, 0.54425207, 0.64198122, 0.35707117],
+                            "gamma": 2"""
     print("Load Model")
     if args.continue_train:
-        model = UNet.load_from_checkpoint(args.continue_pth)
-        print("Train")
+        print("Train_Continue")
+        model = UNet.load_from_checkpoint(args.continue_pth) 
         trainer.fit(model=model, datamodule=data_module, ckpt_path=args.continue_pth)
     else:
         model = UNet(**model_input)

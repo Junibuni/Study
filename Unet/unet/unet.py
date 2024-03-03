@@ -1,5 +1,8 @@
+import os
+
 import torch
 import torch.nn as nn
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torchvision
 from torchmetrics.classification import (Dice,
                                          MulticlassF1Score,
@@ -21,7 +24,6 @@ class UNet(pl.LightningModule):
         super(UNet, self).__init__()
         self.save_hyperparameters()
 
-        self.validation_step_outputs = []
         self.criterion = self.loss_function(loss_fn)
         self.metrics = ["dice", "f1", "acc", "precision", "recall", "jaccard"]
         self._init_metrics({"num_classes": num_classes})
@@ -36,13 +38,12 @@ class UNet(pl.LightningModule):
         self.module4 = network.Up(128, last_channel, self.size[4])
         self.additional_module = nn.Identity()
 
-        
+        #If not UNet, add a layer to UpConv + DoubleConv to match original image size
         if "unet" not in self.backbone_name:
-            last_channel = 32
-            self.additional_module = nn.Sequential([
-                nn.ConvTranspose2d(64, last_channel, kernel_size=2, stride=2), # double up channel
-                network.DoubleConv(last_channel, 16)
-            ])
+            self.additional_module = nn.Sequential(
+                nn.ConvTranspose2d(64, 32, kernel_size=2, stride=2), # double up channel
+                network.DoubleConv(32, 16)
+            )
             last_channel = 16
             
         self.final_module = network.FinalConv(last_channel, num_classes)
@@ -62,6 +63,7 @@ class UNet(pl.LightningModule):
         x = self.module2(x, features[layer.pop()])
         x = self.module3(x, features[layer.pop()])
         x = self.module4(x, features[layer.pop()])
+        x = self.additional_module(x)
         out = self.final_module(x)
 
         return out
@@ -124,8 +126,9 @@ class UNet(pl.LightningModule):
     def configure_optimizers(self):
         assert self.hparams.optimizer and self.hparams.optim_params, "Optimizer not passed!"
         optimizer = self.hparams.optimizer(self.parameters(),**self.hparams.optim_params)
+        scheduler = ReduceLROnPlateau(optimizer=optimizer, mode="min")
 
-        return optimizer
+        return {"optimizer": optimizer, "lr_scheduler": scheduler, "monitor": "step_val_loss"}
     
     def shared_step(self, data, target):
         output = self.forward(data)
@@ -136,7 +139,7 @@ class UNet(pl.LightningModule):
     def training_step(self, train_batch, batch_idx):
         loss, _, _ = self.shared_step(*train_batch)
         self.log_dict({'step_train_loss': loss})
-
+        
         return loss
 
     def validation_step(self, val_batch, batch_idx):
@@ -159,7 +162,12 @@ class UNet(pl.LightningModule):
 
                 self.img_stack_original.append(gt_image)
                 self.img_stack_predicted.append(dt_image)
-   
+        """
+        dent:Green
+        glass-break:Blue
+        scratch:Red
+        smash:Yellow
+        """
         return loss
 
     def unnormalize(self, tensor):
@@ -179,13 +187,23 @@ class UNet(pl.LightningModule):
 
         self._reset_metrics()
 
-        grid_original = torchvision.utils.make_grid(self.img_stack_original, nrow=self.batch_size)
-        grid_predicted = torchvision.utils.make_grid(self.img_stack_predicted, nrow=self.batch_size)
+        grid_original = torchvision.utils.make_grid(self.img_stack_original, nrow=self.batch_size*2)
+        grid_predicted = torchvision.utils.make_grid(self.img_stack_predicted, nrow=self.batch_size*2)
+
+        compare_img = self.img_stack_original[:5] + self.img_stack_predicted[:5]
+        grid_compare = torchvision.utils.make_grid(compare_img, nrow=5)
+
         for logger in self.trainer.loggers:
             if isinstance(logger, pl.loggers.tensorboard.TensorBoardLogger):
-                logger.experiment.add_image('Original mask', grid_original, self.global_step)
+                if self.current_epoch == 0:
+                    logger.experiment.add_image('Original mask', grid_original, self.global_step)
                 logger.experiment.add_image('Predicted mask', grid_predicted, self.global_step)
 
+                logger.experiment.add_image('Compare mask', grid_compare, self.global_step)
+
+        if self.current_epoch == 0:
+            torchvision.utils.save_image(grid_original, os.path.join(self.logger.log_dir, f"target_mask.png"))
+        torchvision.utils.save_image(grid_predicted, os.path.join(self.logger.log_dir, f"{self.current_epoch}_epoch_pred_mask.png"))
         self.img_stack_original = []
         self.img_stack_predicted = []
 

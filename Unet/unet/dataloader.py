@@ -64,7 +64,7 @@ def torch_divmod(dividend:torch.Tensor, divisor:int):
     return quotient, remainder
 
 def collate_fn(batch):
-    images, masks = zip(*batch)
+    """images, masks = zip(*batch)
 
     max_height = max(img.size()[1] for img in images)
     max_width = max(img.size()[0] for img in images)
@@ -92,7 +92,10 @@ def collate_fn(batch):
         padded_images.append(padded_img)
         padded_masks.append(padded_mask)
 
-    return torch.stack(padded_images), torch.stack(padded_masks)
+    return torch.stack(padded_images), torch.stack(padded_masks)"""
+    
+    images, masks = zip(*batch)
+    return torch.stack(images), torch.stack(masks)
 
 class DataModule(pl.LightningDataModule):
     def __init__(self, *, dataset_root, batch_size):
