@@ -16,14 +16,14 @@ def argument_parser():
     parser.add_argument("--mode", default="train", choices=["train", "test"], type=str)
     parser.add_argument("--lr", default=1e-4, type=float)
     parser.add_argument("--batch_size", default=4, type=int)
-    parser.add_argument("--num_epoch", default=50, type=int)
+    parser.add_argument("--num_epoch", default=100, type=int)
     parser.add_argument("--dataset_pth", default="Unet\datasets", type=str)
     parser.add_argument("--log_pth", default="Unet\logs", type=str)
     parser.add_argument("--device", default="gpu", type=str)
     parser.add_argument("--precision", default="16-mixed", type=str)
     parser.add_argument("--loss_fn", default="focal", type=str)
     parser.add_argument("--max_train_batch", default=1.0, type=float)
-    parser.add_argument("--backbone", default="resnet50", choices=["unet", "resnet50", "efficientnetb0", "vgg19"], type=str)
+    parser.add_argument("--backbone", default="efficientnetb0", choices=["unet", "resnet50", "efficientnetb0", "vgg19"], type=str)
     parser.add_argument("--log_step", default=10, type=int)
     parser.add_argument("--continue_train", default=False, type=bool)
     parser.add_argument("--continue_pth", default=r"", type=str)
@@ -37,7 +37,7 @@ def main(args):
     seed_everything(args.seed)
 
     print(f"Loading Loggers")
-    version_name = f"lr_{args.lr:.0e}_{args.loss_fn}_lrscheduled_gamma5"
+    version_name = f"lr_{args.lr:.0e}_{args.loss_fn}_lrscheduled_gamma2_sum"
     csv_logger = CSVLogger(args.log_pth, name=os.path.join(args.backbone, "CSVLogger"), version=version_name)
     tb_logger = TensorBoardLogger(save_dir=args.log_pth, name=os.path.join(args.backbone, "TBLogger"), version=version_name)
 
@@ -57,17 +57,17 @@ def main(args):
     
     print("Initialize DataModule")
     data_module = DataModule(dataset_root=args.dataset_pth, batch_size=args.batch_size)
-
+  
     model_input = dict(
         optimizer = torch.optim.Adam,
         optim_params = dict(lr=args.lr, betas=(0.9, 0.999), weight_decay=1e-4),
         loss_fn = args.loss_fn,
-        criterion_params = {"alpha": [0.10439873, 0.3914727, 0.54425207, 0.64198122, 0.35707117],
-                            "gamma": 5}, 
+        criterion_params = {"alpha": [1, 1, 1, 1, 1],
+                            "gamma": 2,
+                            "reduction": "sum"}, 
         backbone_name = args.backbone
     )
-    """"alpha": [0.10439873, 0.3914727, 0.54425207, 0.64198122, 0.35707117],
-                            "gamma": 2"""
+
     print("Load Model")
     if args.continue_train:
         print("Train_Continue")
