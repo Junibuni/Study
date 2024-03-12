@@ -5,7 +5,7 @@ import torch.nn as nn
 import numpy as np
 
 class Encoder(nn.Module):
-    def __init__(self, in_c, in_shape, bb_out=128, znum=16, concat=True):
+    def __init__(self, in_c, in_shape, num_sb=4, bb_out=128, znum=16, concat=True):
         super(Encoder, self).__init__()
         # in_shape: list/tuple in BCHW format
         repeat_num = int(np.log2(np.max(in_shape[2:]))) - 2
@@ -14,12 +14,12 @@ class Encoder(nn.Module):
         self.first_conv = nn.Conv2d(in_c, 128, kernel_size=3, stride=1, padding=1, bias=True) # match channel to 128
         self.big_blocks = nn.Sequential()
 
-        self.big_blocks.add_module("big_block_0", BigBlock(128, bb_out))
+        self.big_blocks.add_module("big_block_0", BigBlock(128, bb_out, num_small_block=num_sb))
         for i in range(1, repeat_num):
-            self.big_blocks.add_module(f"big_block_{i}", BigBlock(bb_out, bb_out, type="encoder")) # in(in_c) out(128)
+            self.big_blocks.add_module(f"big_block_{i}", BigBlock(bb_out, bb_out, num_small_block=num_sb, type="encoder")) # in(in_c) out(128)
 
         divisor = 2**repeat_num
-        result = int(reduce(lambda x, y: x * (y / divisor), in_shape[2:], 1)) * 128
+        result = int(reduce(lambda x, y: x * (y / divisor), in_shape[2:], 1)) * bb_out
         print("result: ", result)
         self.linear = nn.Linear(result, znum)
 
@@ -28,7 +28,7 @@ class Encoder(nn.Module):
         x = self.big_blocks(x)
 
         # flatten(reshape)
-        print(x.shape)
+        # print(x.shape)
         x = x.view(x.size(0), -1)
         return self.linear(x)
 
@@ -76,14 +76,14 @@ class BigBlock(nn.Module):
         # in_c*2 by concat
         match type:
             case "encoder": #conv
-                self.pool = nn.Conv2d(128*2, out_c, kernel_size=3, stride=2, padding=1, bias=True)
+                self.pool = nn.Conv2d(128+in_c, out_c, kernel_size=3, stride=2, padding=1, bias=True)
             case "decoder": #upconv
-                self.pool = nn.ConvTranspose2d(128*2, out_c, kernel_size=4, stride=2, padding=1, bias=True)
+                self.pool = nn.ConvTranspose2d(128+in_c, out_c, kernel_size=4, stride=2, padding=1, bias=True)
     
     def forward(self, x):
         x0 = x
         x = self.small_blocks(x)
-        print(x0.shape, x.shape)
+        #print(x0.shape, x.shape)
         x = torch.concat([x, x0], dim=1)
 
         x = self.pool(x)
