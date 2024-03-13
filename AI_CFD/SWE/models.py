@@ -14,14 +14,16 @@ class Encoder(nn.Module):
         self.first_conv = nn.Conv2d(in_c, 128, kernel_size=3, stride=1, padding=1, bias=True) # match channel to 128
         self.big_blocks = nn.Sequential()
 
-        self.big_blocks.add_module("big_block_0", BigBlock(128, bb_out, num_small_block=num_sb))
+        self.big_blocks.add_module("big_block_0", BigBlock(128, bb_out, num_small_block=num_sb, type="encoder"))
         for i in range(1, repeat_num):
             self.big_blocks.add_module(f"big_block_{i}", BigBlock(bb_out, bb_out, num_small_block=num_sb, type="encoder")) # in(in_c) out(128)
 
-        divisor = 2**repeat_num
-        result = int(reduce(lambda x, y: x * (y / divisor), in_shape[2:], 1)) * bb_out
-        print("result: ", result)
-        self.linear = nn.Linear(result, znum)
+        divisor = 2 ** repeat_num
+        reduced_dim = np.prod(np.array(in_shape[2:]) // divisor)
+        reshaped_dim = reduced_dim * bb_out
+
+        print("reshaped_dim: ", reshaped_dim)
+        self.linear = nn.Linear(reshaped_dim, znum)
 
     def forward(self, x):
         x = self.first_conv(x)
@@ -33,12 +35,37 @@ class Encoder(nn.Module):
         return self.linear(x)
 
 class Decoder(nn.Module):
-    def __init__(self):
+    def __init__(self, out_shape, out_c=1, num_sb=4, bb_out=128, znum=16, concat=True):
         super(Decoder, self).__init__()
-        pass
+        repeat_num = int(np.log2(np.max(out_shape[2:]))) - 2
+        assert(repeat_num > 0 and np.sum([i % np.power(2, repeat_num-1) for i in out_shape[2:]]) == 0)
+
+        self.x0_shape = [out_shape[0], 128] + [int(i/np.power(2, repeat_num)) for i in out_shape[2:]] 
+        
+        divisor = 2 ** repeat_num
+        reduced_dim = np.prod(np.array(out_shape[2:]) // divisor)
+        reshaped_dim = reduced_dim * bb_out
+        
+        self.linear = nn.Linear(znum, reshaped_dim)
+
+        self.big_blocks = nn.Sequential()
+
+        self.big_blocks.add_module("big_block_0", BigBlock(128, bb_out, num_small_block=num_sb, type="decoder"))
+        for i in range(1, repeat_num):
+            self.big_blocks.add_module(f"big_block_{i}", BigBlock(bb_out, bb_out, num_small_block=num_sb, type="decoder"))
+
+        self.last_conv = nn.Conv2d(bb_out, out_c, kernel_size=3, stride=1, padding=1, bias=True)
 
     def forward(self, x):
-        pass
+        print(x.shape)
+        print(x)
+        x = self.linear(x)
+        print(x.shape)
+        x = x.view(self.x0_shape)
+
+        x = self.big_blocks(x)
+        
+        return self.last_conv(x)
 
 class IntegrationNet(nn.Module):
     def __init__(self):
@@ -93,13 +120,26 @@ class BigBlock(nn.Module):
         
         
 if __name__ == "__main__":
-    input_size = (4, 1, 768, 512)
-    input = torch.randn(input_size)
-
-    encoder = Encoder(1, input.shape)
+    #BCHW
+    input_size = (1, 1, 768, 512)
+    input = torch.randn(input_size).to("cuda")
+    
+    encoder = Encoder(1, input.shape).to("cuda")
     print(encoder)
     output = encoder(input)
 
     print(output.shape)
     print()
     print(output)
+
+    # from torchsummary import summary
+    # decoder = Decoder(input.shape).to("cuda")
+    # print(summary(decoder, input_size=[[16]]))
+    decoder = Decoder(input.shape).to("cuda")
+    output = decoder(output)
+
+    print(output.shape)
+    print()
+    print(output)
+
+    
