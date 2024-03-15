@@ -7,6 +7,7 @@ Papers
 */.data/*
 .datasets
 */datasets/*
+**/datasets
 .__pycache__
 */__pycache__/*
 **/__pycache__
