@@ -22,7 +22,6 @@ class Encoder(nn.Module):
         reduced_dim = np.prod(np.array(in_shape[2:]) // divisor)
         reshaped_dim = reduced_dim * bb_out
 
-        print("reshaped_dim: ", reshaped_dim)
         self.linear = nn.Linear(reshaped_dim, znum)
 
     def forward(self, x):
@@ -57,23 +56,11 @@ class Decoder(nn.Module):
         self.last_conv = nn.Conv2d(bb_out, out_c, kernel_size=3, stride=1, padding=1, bias=True)
 
     def forward(self, x):
-        print(x.shape)
-        print(x)
         x = self.linear(x)
-        print(x.shape)
         x = x.view(self.x0_shape)
-
         x = self.big_blocks(x)
         
         return self.last_conv(x)
-
-class IntegrationNet(nn.Module):
-    def __init__(self):
-        super(IntegrationNet, self).__init__()
-        pass
-
-    def forward(self, x):
-        pass
 
 class SmallBlock(nn.Module):
     def __init__(self, in_c, out_c=128):
