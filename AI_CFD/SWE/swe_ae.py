@@ -1,4 +1,5 @@
 import os
+from collections import deque
 
 import torch
 import torch.nn as nn
@@ -27,7 +28,7 @@ class SWE_AE(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x = batch
-        y_hat = self(x)
+        y_hat = self.forward(x)
 
         loss = self._get_loss(x, y_hat)
         self.log_dict({'step_train_loss': loss})
@@ -48,23 +49,30 @@ class SWE_AE(pl.LightningModule):
         return loss
     
 class CombinedModel(pl.LightningModule):
-    def __init__(self, autoencoder, linear_fcn):
+    def __init__(self, *, autoencoder, znum=16, pnum=2, batch_size=4):
         super(CombinedModel, self).__init__()
-        self.autoencoder = autoencoder
+        self.save_hyperparameters()
+
+        self.queue = deque(maxlen=30+self.hparams.batch_size)
+
+        # Inputs [c_t, Δp_t] = [z_t, p_t, Δp_t]
+        # Outputs [Δz_t]
+        out_shape = self.hparams.znum - self.hparams.pnum
+        self.autoencoder = self.hparams.autoencoder
         self.integration_net = nn.Sequential(
-            nn.Linear(),
+            nn.Linear(self.hparams.znum, 1024, bias=False),
             nn.ReLU(),
-            nn.BatchNorm1d(),
+            nn.BatchNorm1d(1024),
             nn.Dropout(0.1),
             
-            nn.Linear(),
+            nn.Linear(1024, 512, bias=False),
             nn.ReLU(),
-            nn.BatchNorm1d(),
+            nn.BatchNorm1d(512),
             nn.Dropout(0.1),
 
-            nn.Linear(),
+            nn.Linear(512, out_shape), # Δz_t (znum-pnum): pnum is supervised
             nn.ReLU(),
-            nn.BatchNorm1d(),
+            nn.BatchNorm1d(out_shape),
             nn.Dropout(0.1)
         )
 
@@ -78,7 +86,13 @@ class CombinedModel(pl.LightningModule):
         return x
     
     def training_step(self, batch, batch_idx):
-        pass
+        x = batch
+        y_hat = self(x)
+
+        loss = self._get_loss(x, y_hat)
+        self.log_dict({'step_train_loss': loss})
+
+        return loss
 
     def configure_optimizers(self):
         pass
