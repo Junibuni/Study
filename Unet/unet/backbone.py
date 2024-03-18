@@ -50,7 +50,7 @@ class UNetEncoder(nn.Module):
 if __name__ == "__main__":
     from torchvision.models.feature_extraction import create_feature_extractor
     from torchsummary import summary
-    backbone_name = "vgg19"
+    backbone_name = "efficientnetb0"
     layer_concat = {
             "unet": ["module1", "module2", "module3", "module4", "module5"],
             "resnet50": ["relu", "layer1", "layer2", "layer3", "layer4"],
@@ -61,3 +61,16 @@ if __name__ == "__main__":
     encoder = create_feature_extractor(get_backbone(backbone_name).to("cuda"), layer_concat[backbone_name])
 
     print(summary(encoder, input_size=(3, 640, 640)))
+
+    layer_name = "features.2"
+    found_layer = False
+    for name, param in encoder.named_parameters():
+        param.requires_grad = False
+        if layer_name in name:
+            found_layer = True
+        elif layer_name not in name and found_layer:
+            param.requires_grad = True
+        
+
+    for name, param in encoder.named_parameters():
+        print(name, param.requires_grad)

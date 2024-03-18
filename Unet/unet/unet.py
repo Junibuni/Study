@@ -15,12 +15,12 @@ from torchvision.models.feature_extraction import create_feature_extractor
 import numpy as np
 
 from . import network
-from .utils import add_mask
+from .utils import add_mask, freeze_layers
 from .backbone import get_backbone
 from .losses import FocalLoss, MeanIoU
 
 class UNet(pl.LightningModule):
-    def __init__(self, *, optimizer, optim_params, criterion_params, in_channels=3, num_classes=5, backbone_name="unet", loss_fn="crossentropy"):
+    def __init__(self, *, optimizer, optim_params, criterion_params, in_channels=3, num_classes=5, backbone_name="unet", loss_fn="crossentropy", freeze_until=None):
         super(UNet, self).__init__()
         self.save_hyperparameters()
 
@@ -30,6 +30,9 @@ class UNet(pl.LightningModule):
 
         self.backbone_name = backbone_name
         self.encoder = create_feature_extractor(get_backbone(self.backbone_name), self.layer)
+        if freeze_until:
+            freeze_layers(self.encoder, self.layer[freeze_until])
+            
 
         last_channel = 64
         self.module1 = network.Up(self.size[0], 512, self.size[1])

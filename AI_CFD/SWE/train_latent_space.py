@@ -63,6 +63,8 @@ def main(args):
     AE_model = SWE_AE(**AE_model_input)
     AE_model.load_state_dict(checkpoint['state_dict'])
     AE_model.eval()
+    #use encoder and save data
+    #use deque to load consecutive 30 data
 
     integration_net = 
 

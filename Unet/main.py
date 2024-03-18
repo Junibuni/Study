@@ -21,7 +21,7 @@ def argument_parser():
     parser.add_argument("--log_pth", default="Unet\logs", type=str)
     parser.add_argument("--device", default="gpu", type=str)
     parser.add_argument("--precision", default="16-mixed", type=str)
-    parser.add_argument("--loss_fn", default="focal", type=str)
+    parser.add_argument("--loss_fn", default="crossentropy", type=str)
     parser.add_argument("--max_train_batch", default=1.0, type=float)
     parser.add_argument("--backbone", default="efficientnetb0", choices=["unet", "resnet50", "efficientnetb0", "vgg19"], type=str)
     parser.add_argument("--log_step", default=10, type=int)
@@ -37,7 +37,7 @@ def main(args):
     seed_everything(args.seed)
 
     print(f"Loading Loggers")
-    version_name = f"lr_{args.lr:.0e}_{args.loss_fn}_lrscheduled_gamma2_sum"
+    version_name = f"lr_{args.lr:.0e}_{args.loss_fn}_lrscheduled_freeze4"
     csv_logger = CSVLogger(args.log_pth, name=os.path.join(args.backbone, "CSVLogger"), version=version_name)
     tb_logger = TensorBoardLogger(save_dir=args.log_pth, name=os.path.join(args.backbone, "TBLogger"), version=version_name)
 
@@ -62,10 +62,9 @@ def main(args):
         optimizer = torch.optim.Adam,
         optim_params = dict(lr=args.lr, betas=(0.9, 0.999), weight_decay=1e-4),
         loss_fn = args.loss_fn,
-        criterion_params = {"alpha": [1, 1, 1, 1, 1],
-                            "gamma": 2,
-                            "reduction": "sum"}, 
-        backbone_name = args.backbone
+        criterion_params = {}, 
+        backbone_name = args.backbone,
+        freeze_until = 4
     )
 
     print("Load Model")

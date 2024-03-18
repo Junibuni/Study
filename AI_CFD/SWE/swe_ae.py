@@ -53,12 +53,9 @@ class CombinedModel(pl.LightningModule):
         super(CombinedModel, self).__init__()
         self.save_hyperparameters()
 
-        self.queue = deque(maxlen=30+self.hparams.batch_size)
-
         # Inputs [c_t, Δp_t] = [z_t, p_t, Δp_t]
         # Outputs [Δz_t]
         out_shape = self.hparams.znum - self.hparams.pnum
-        self.autoencoder = self.hparams.autoencoder
         self.integration_net = nn.Sequential(
             nn.Linear(self.hparams.znum, 1024, bias=False),
             nn.ReLU(),
@@ -76,23 +73,35 @@ class CombinedModel(pl.LightningModule):
             nn.Dropout(0.1)
         )
 
-        for param in self.autoencoder.encoder.parameters():
-            param.requires_grad = False
-
     def forward(self, x):
-        with torch.no_grad():
-            x = self.autoencoder.encoder(x)
         x = self.integration_net(x)
         return x
     
     def training_step(self, batch, batch_idx):
-        x = batch
-        y_hat = self(x)
-
-        loss = self._get_loss(x, y_hat)
+        # loss =  1/30 sum L2(Δz_t - T(x))
+        # get 30 data as batch, yhat for 31st data
+        
+        # TODO
         self.log_dict({'step_train_loss': loss})
 
         return loss
 
     def configure_optimizers(self):
         pass
+
+if __name__ == "__main__":
+    input_size = (1, 1, 384, 256)
+    input = torch.randn(input_size)
+
+    model_input = dict(
+        optim_params = dict(lr=1e-4),
+        scheduler_params = dict(T_max=100),
+        input_size = (1, 1, 384, 256)
+    )
+
+    torch.set_grad_enabled(False)
+    ae = SWE_AE(**model_input).eval()
+    out = ae(input)
+    print(out)
+    out = ae.encoder(input)
+    print(out)

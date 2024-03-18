@@ -108,7 +108,7 @@ class BigBlock(nn.Module):
         
 if __name__ == "__main__":
     #BCHW
-    input_size = (1, 1, 768, 512)
+    input_size = (1, 1, 384, 256)
     input = torch.randn(input_size).to("cuda")
     
     encoder = Encoder(1, input.shape).to("cuda")
