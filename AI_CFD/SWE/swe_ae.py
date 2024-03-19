@@ -62,7 +62,7 @@ class SWE_AE(pl.LightningModule):
         self.mask = self.mask.to(self.device)
     
 class LinearNet(pl.LightningModule):
-    def __init__(self, *, autoencoder, znum=16, pnum=2, batch_size=4):
+    def __init__(self, *, znum=16, pnum=2, batch_size=4):
         super(LinearNet, self).__init__()
         self.save_hyperparameters()
 
@@ -104,18 +104,26 @@ class LinearNet(pl.LightningModule):
         return optimizer
 
 if __name__ == "__main__":
-    input_size = (1, 1, 384, 256)
+    # input_size = (1, 1, 384, 256)
+    # input = torch.randn(input_size)
+
+    # model_input = dict(
+    #     optim_params = dict(lr=1e-4),
+    #     scheduler_params = dict(T_max=100),
+    #     input_size = (1, 1, 384, 256)
+    # )
+
+    # torch.set_grad_enabled(False)
+    # ae = SWE_AE(**model_input).eval()
+    # out = ae(input)
+    # print(out)
+    # out = ae.encoder(input)
+    # print(out)
+
+    input_size = (1, 32)
     input = torch.randn(input_size)
-
-    model_input = dict(
-        optim_params = dict(lr=1e-4),
-        scheduler_params = dict(T_max=100),
-        input_size = (1, 1, 384, 256)
-    )
-
     torch.set_grad_enabled(False)
-    ae = SWE_AE(**model_input).eval()
-    out = ae(input)
-    print(out)
-    out = ae.encoder(input)
-    print(out)
+    
+    model = LinearNet(znum=32, pnum=6).eval()
+    out = model(input)
+    print(input, input.shape)
