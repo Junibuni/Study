@@ -17,7 +17,7 @@ def argument_parser():
     parser.add_argument("--mode", default="train", choices=["train", "test"], type=str)
     parser.add_argument("--lr", default=2e-4, type=float)
     parser.add_argument("--batch_size", default=4, type=int)
-    parser.add_argument("--num_epoch", default=300, type=int)
+    parser.add_argument("--num_epoch", default=150, type=int)
     parser.add_argument("--device", default="gpu", type=str)
     parser.add_argument("--precision", default="16-mixed", type=str)
     parser.add_argument("--max_train_batch", default=1.0, type=float) #for test (ratio)
@@ -31,7 +31,7 @@ def main(args):
     torch.set_float32_matmul_precision("medium")
     seed_everything(args.seed)
 
-    version_name = "ae"
+    version_name = "ae3"
     csv_logger = CSVLogger(args.log_pth, name="CSVLogger", version=version_name)
     tb_logger = TensorBoardLogger(save_dir=args.log_pth, name="TBLogger", version=version_name)
 
@@ -51,7 +51,7 @@ def main(args):
     data_module = DataModule(dataset_root=args.dataset_pth, batch_size=args.batch_size)
 
     model_input = dict(
-        optim_params = dict(lr=args.lr),
+        optim_params = dict(lr=args.lr, betas=(0.9, 0.999)),
         scheduler_params = dict(T_max=100),
         input_size = (args.batch_size, 1, 384, 256)
     )
