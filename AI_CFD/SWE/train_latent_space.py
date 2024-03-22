@@ -66,7 +66,7 @@ def main(args):
     #use encoder and save data
     #use deque to load consecutive 30 data
 
-    integration_net = 
+    integration_net = _
 
     combined_model = CombinedModel(AE_model, )
     print("Train")

@@ -14,21 +14,21 @@ from models import Encoder, Decoder
 from utils import depth_gradient_loss
 
 class SWE_AE(pl.LightningModule):
-    def __init__(self, *, optim_params, scheduler_params, input_size, mode="ae", znum=16, pnum=2):
+    def __init__(self, *, optim_params, scheduler_params, input_size, mode="ae", znum=16, pnum=2, in_c=1, out_c=1, loss_ratio=[1., 1., 0.5]):
         # mode: ae, comp, sim
         super(SWE_AE, self).__init__()
         self.save_hyperparameters()
 
-        self.encoder = Encoder(in_c=1, znum=self.hparams.znum, in_shape=self.hparams.input_size)
-        self.decoder = Decoder(out_c=1, znum=self.hparams.znum, out_shape=self.hparams.input_size)
+        self.encoder = Encoder(in_c=self.hparams.in_c, znum=self.hparams.znum, in_shape=self.hparams.input_size)
+        self.decoder = Decoder(out_c=self.hparams.out_c, znum=self.hparams.znum, out_shape=self.hparams.input_size)
 
-        mask = np.zeros((znum,))
-        mask[-pnum:] = 1
+        mask = np.zeros((self.hparams.znum,))
+        mask[-self.hparams.pnum:] = 1
         self.mask = torch.tensor(mask, dtype=torch.float32)
 
     def forward(self, x):
         x = self.encoder(x)
-        latent_vec = x.clone().detach()
+        latent_vec = x
         x = self.decoder(x)
         return x, latent_vec
 
@@ -36,16 +36,17 @@ class SWE_AE(pl.LightningModule):
         x, p = batch
         y_hat, latent_vec = self.forward(x)
 
-        loss = self._get_loss(x, y_hat, latent_vec, p)
+        depth_map = x.c[:, 0:1, :, :] # extract first channel
+        loss = self._get_loss(depth_map, y_hat, latent_vec, p)
         self.log_dict({'step_train_loss': loss})
 
         return loss
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), **self.hparams.optim_params)
-        scheduler = CosineAnnealingLR(optimizer=optimizer, **self.hparams.scheduler_params)
+        scheduler = CosineAnnealingLR(optimizer=optimizer, **self.hparams.scheduler_params) # no need to monitor
 
-        return {"optimizer": optimizer, "lr_scheduler": scheduler, "monitor": "step_val_loss"}
+        return {"optimizer": optimizer, "lr_scheduler": scheduler}
 
     def _get_loss(self, y, y_hat, latent_vec, p):
         mse_loss = F.mse_loss(y, y_hat, reduction="sum") # mass conservation
@@ -55,7 +56,8 @@ class SWE_AE(pl.LightningModule):
         latent_vec = latent_vec * self.mask
         latent_vec_loss = torch.mean((p - latent_vec) ** 2)
         
-        loss = 1.0*mse_loss + 0.8*grad_loss + 0.5*latent_vec_loss
+        ratio = self.hparams.loss_ratio
+        loss = ratio[0]*mse_loss + ratio[1]*grad_loss + ratio[2]*latent_vec_loss
         return loss
     
     def on_train_start(self):
@@ -80,7 +82,7 @@ class LinearNet(pl.LightningModule):
             nn.BatchNorm1d(512),
             nn.Dropout(0.1),
 
-            nn.Linear(512, out_shape), # Δz_t (znum-pnum): pnum is supervised
+            nn.Linear(512, out_shape, bias=False), # Δz_t (znum-pnum): pnum is supervised
             nn.ReLU(),
             nn.BatchNorm1d(out_shape),
             nn.Dropout(0.1)
@@ -125,5 +127,18 @@ if __name__ == "__main__":
     torch.set_grad_enabled(False)
     
     model = LinearNet(znum=32, pnum=6).eval()
-    out = model(input)
-    print(input, input.shape)
+
+    ref_value = torch.tensor([1, 0, 1, 1, 1, 0])
+    ref_value = ref_value.unsqueeze(0)
+    for i in range(3):
+        out = model(input)
+        print(out, out.shape)
+        out = torch.cat((out, ref_value), dim=1)
+        print(out, out.shape)
+
+        input = out + input
+        print(input, input.shape)
+        
+    # out = model(input)
+    # print(input, input.shape)
+    # print(out, out.shape)

@@ -53,7 +53,12 @@ def main(args):
     model_input = dict(
         optim_params = dict(lr=args.lr, betas=(0.9, 0.999)),
         scheduler_params = dict(T_max=100),
-        input_size = (args.batch_size, 1, 384, 256)
+        input_size = (args.batch_size, 4, 384, 256),
+        znum = 32,
+        pnum = 6,
+        in_c = 3,
+        out_c = 1,
+        loss_ratio = [1., 1., 0.5]
     )
 
     model = SWE_AE(**model_input)
