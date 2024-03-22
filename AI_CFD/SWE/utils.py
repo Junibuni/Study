@@ -2,13 +2,10 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 
-def unnormalize(tensor):
-        mean = 0.0
-        std = 0.2
-
+def unnormalize(tensor, mean, std):
         copy_tensor = tensor.clone()
         for i in range(copy_tensor.shape[1]):
-            copy_tensor[:, i] = copy_tensor[:, i] * std + mean
+            copy_tensor[:, i] = copy_tensor[:, i] * std[i] + mean[i]
 
         return copy_tensor
 
@@ -45,12 +42,12 @@ def depth_gradient_loss(target_depth, output_depth):
     return loss
 
 if __name__ == "__main__":
-    target_depth_map = np.array([[[[1, 2, 3],
+    target_depth_map = torch.tensor([[[[1, 2, 3],
                                 [4, 5, 6],
-                                [7, 8, 9]]]])
-    output_depth_map = np.array([[[[1, 2, 3],
+                                [7, 8, 9]]]], dtype=torch.float32)
+    output_depth_map = torch.tensor([[[[1, 2, 3],
                                 [4, 5, 6],
-                                [7, 8, 9.01]]]])
+                                [7, 8, 9.01]]]], dtype=torch.float32)
     
     loss = depth_gradient_loss(target_depth_map, output_depth_map)
     print("L1 Depth Gradient Loss:", loss.item())
