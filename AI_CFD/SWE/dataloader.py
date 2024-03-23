@@ -35,10 +35,11 @@ class CustomDataset(Dataset):
                 manhole_duration = (int(case_name)%10)*120
                 if int(file_number) < manhole_duration:
                     row_data = csv_data[csv_data["Case #"] == int(case_name)]
-                    assert row_data
+                    assert row_data, f"data not found on csv file for {case_name}"
                     manhole_data = row_data.values.tolist()[0][1:-1]
                 else:
-                    manhole_data = [0] * 6
+                    manhole_data = [0] * pnum
+                assert (len(manhole_data) == pnum), f"length of pnum({pnum}) does not match csv data({len(manhole_data)})"
 
                 file_groups.setdefault(file_number, {}).setdefault(file_type, filename)
                 file_groups[file_number]["manhole_data"] = manhole_data
