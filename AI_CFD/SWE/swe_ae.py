@@ -24,7 +24,8 @@ class SWE_AE(pl.LightningModule):
 
         mask = np.zeros((self.hparams.znum,))
         mask[-self.hparams.pnum:] = 1
-        self.mask = torch.tensor(mask, dtype=torch.float32)
+        mask = torch.tensor(mask, dtype=torch.float32)
+        self.register_buffer("mask", mask)
 
     def forward(self, x):
         latent_vec = self.encoder(x)
@@ -59,9 +60,6 @@ class SWE_AE(pl.LightningModule):
         loss = ratio[0]*mse_loss + ratio[1]*grad_loss + ratio[2]*latent_vec_loss
         self.log_dict({'mse_loss': mse_loss, 'grad_loss': grad_loss, 'latent_vec_loss': latent_vec_loss})
         return loss
-    
-    def on_train_start(self):
-        self.mask = self.mask.to(self.device)
     
 class LinearNet(pl.LightningModule):
     def __init__(self, *, znum=16, pnum=2, batch_size=4):
