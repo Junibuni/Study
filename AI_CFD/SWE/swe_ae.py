@@ -27,10 +27,9 @@ class SWE_AE(pl.LightningModule):
         self.mask = torch.tensor(mask, dtype=torch.float32)
 
     def forward(self, x):
-        x = self.encoder(x)
-        latent_vec = x
-        x = self.decoder(x)
-        return x, latent_vec
+        latent_vec = self.encoder(x)
+        out = self.decoder(latent_vec)
+        return out, latent_vec
 
     def training_step(self, batch, batch_idx):
         x, p = batch
@@ -58,6 +57,7 @@ class SWE_AE(pl.LightningModule):
         
         ratio = self.hparams.loss_ratio
         loss = ratio[0]*mse_loss + ratio[1]*grad_loss + ratio[2]*latent_vec_loss
+        self.log_dict({'mse_loss': mse_loss, 'grad_loss': grad_loss, 'latent_vec_loss': latent_vec_loss})
         return loss
     
     def on_train_start(self):
