@@ -61,7 +61,7 @@ class CustomDataset(Dataset):
 
         # TODO: Normalize by channel   
         preprocess = transforms.Compose([transforms.ToTensor(),
-                                        transforms.Normalize((0.0,), (0.2,))
+                                        #transforms.Normalize((0.0,), (0.2,))
                                         ])
         
         img = preprocess(img)
