@@ -18,7 +18,9 @@ class CustomDataset(Dataset):
         self.file_path = os.path.join(root, split)
         cases = os.listdir(self.file_path)
 
-        csv_data = pd.read_csv(os.path.join(root, "case_data.csv"))
+        csv_file_path = os.path.join(root, "case_data.csv")
+        assert os.path.isfile(csv_file_path), f"The csv file({csv_file_path}) does not exist."
+        csv_data = pd.read_csv(csv_file_path)
         
         self.grouped_files = []
         for c in cases:
@@ -30,12 +32,12 @@ class CustomDataset(Dataset):
                 basename = os.path.basename(filename) 
                 n = os.path.splitext(basename)[0]
                 file_type, file_number = n.split('_')
-                case_name = dirname.split('/')[1]
+                case_name = os.path.split(dirname)[1]
 
                 manhole_duration = (int(case_name)%10)*120
                 if int(file_number) < manhole_duration:
                     row_data = csv_data[csv_data["Case #"] == int(case_name)]
-                    assert row_data, f"data not found on csv file for {case_name}"
+                    assert not row_data.empty, f"data not found on csv file for {case_name}"
                     manhole_data = row_data.values.tolist()[0][1:-1]
                 else:
                     manhole_data = [0] * pnum
@@ -57,15 +59,15 @@ class CustomDataset(Dataset):
             part_data = np.genfromtxt(file_path, skip_header=6)
             # replace nan
             part_data[np.isnan(part_data)] = 0.0
-            avg_pool_data = np.pad(self._avg_pool(part_data), ((23,0), (47, 0)), mode="constant")
+            avg_pool_data = self._avg_pool(part_data)
             img.append(avg_pool_data)
-
+        img = np.pad(img, ((0,0), (23,0), (47, 0)), mode="constant")
         # TODO: Normalize by channel   
-        preprocess = transforms.Compose([transforms.ToTensor(),
+        preprocess = transforms.Compose([
                                         #transforms.Normalize((0.0,), (0.2,))
                                         ])
         
-        img = preprocess(img)
+        img = torch.from_numpy(img)
         p = torch.zeros(self.znum)
         p[-self.pnum:] = torch.tensor(data["manhole_data"])
 
