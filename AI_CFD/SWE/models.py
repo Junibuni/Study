@@ -27,10 +27,8 @@ class Encoder(nn.Module):
     def forward(self, x):
         x = self.first_conv(x)
         x = self.big_blocks(x)
-
-        # flatten(reshape)
-        # print(x.shape)
         x = x.view(x.size(0), -1)
+        
         return self.linear(x)
 
 class Decoder(nn.Module):
@@ -87,7 +85,7 @@ class BigBlock(nn.Module):
             self.small_blocks.add_module(f"small_block_{i}", SmallBlock(128, 128)) # in(in_c) out(128)
         
         # WARNING: input_size / 2^N != int, size mismatch
-        # in_c*2 by concat
+        # channel size: 128+in_c
         match type:
             case "encoder": #conv
                 self.pool = nn.Conv2d(128+in_c, out_c, kernel_size=3, stride=2, padding=1, bias=True)
@@ -97,7 +95,6 @@ class BigBlock(nn.Module):
     def forward(self, x):
         x0 = x
         x = self.small_blocks(x)
-        #print(x0.shape, x.shape)
         x = torch.concat([x, x0], dim=1)
 
         x = self.pool(x)

@@ -58,7 +58,10 @@ class SWE_AE(pl.LightningModule):
         
         ratio = self.hparams.loss_ratio
         loss = ratio[0]*mse_loss + ratio[1]*grad_loss + ratio[2]*latent_vec_loss
+
+        # logging multitask learning
         self.log_dict({'mse_loss': mse_loss, 'grad_loss': grad_loss, 'latent_vec_loss': latent_vec_loss})
+
         return loss
     
 class LinearNet(pl.LightningModule):

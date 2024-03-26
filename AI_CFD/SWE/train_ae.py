@@ -31,7 +31,7 @@ def main(args):
     torch.set_float32_matmul_precision("medium")
     seed_everything(args.seed)
 
-    version_name = "ae3"
+    version_name = "ae"
     csv_logger = CSVLogger(args.log_pth, name="CSVLogger", version=version_name)
     tb_logger = TensorBoardLogger(save_dir=args.log_pth, name="TBLogger", version=version_name)
 
@@ -58,7 +58,7 @@ def main(args):
         pnum = 6,
         in_c = 3,
         out_c = 1,
-        loss_ratio = [1., 1., 0.5]
+        loss_ratio = [1., 1., 1.]
     )
 
     model = SWE_AE(**model_input)
