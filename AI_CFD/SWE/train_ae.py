@@ -54,7 +54,7 @@ def main(args):
         optim_params = dict(lr=args.lr, betas=(0.9, 0.999)),
         scheduler_params = dict(T_max=100),
         input_size = (args.batch_size, 4, 384, 256),
-        znum = 32,
+        cnum = 32,
         pnum = 6,
         in_c = 3,
         out_c = 1,

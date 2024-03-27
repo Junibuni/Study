@@ -14,15 +14,15 @@ from models import Encoder, Decoder
 from utils import depth_gradient_loss
 
 class SWE_AE(pl.LightningModule):
-    def __init__(self, *, optim_params, scheduler_params, input_size, mode="ae", znum=16, pnum=2, in_c=1, out_c=1, loss_ratio=[1., 1., 0.5]):
+    def __init__(self, *, optim_params, scheduler_params, input_size, mode="ae", cnum=16, pnum=2, in_c=1, out_c=1, loss_ratio=[1., 1., 0.5]):
         # mode: ae, comp, sim
         super(SWE_AE, self).__init__()
         self.save_hyperparameters()
 
-        self.encoder = Encoder(in_c=self.hparams.in_c, znum=self.hparams.znum, in_shape=self.hparams.input_size)
-        self.decoder = Decoder(out_c=self.hparams.out_c, znum=self.hparams.znum, out_shape=self.hparams.input_size)
+        self.encoder = Encoder(in_c=self.hparams.in_c, cnum=self.hparams.cnum, in_shape=self.hparams.input_size)
+        self.decoder = Decoder(out_c=self.hparams.out_c, cnum=self.hparams.cnum, out_shape=self.hparams.input_size)
 
-        mask = np.zeros((self.hparams.znum,))
+        mask = np.zeros((self.hparams.cnum,))
         mask[-self.hparams.pnum:] = 1
         mask = torch.tensor(mask, dtype=torch.float32)
         self.register_buffer("mask", mask)
@@ -65,15 +65,16 @@ class SWE_AE(pl.LightningModule):
         return loss
     
 class LinearNet(pl.LightningModule):
-    def __init__(self, *, znum=16, pnum=2, batch_size=4):
+    def __init__(self, *, cnum=32, pnum=6, batch_size=4):
         super(LinearNet, self).__init__()
         self.save_hyperparameters()
 
         # Inputs [c_t, Δp_t] = [z_t, p_t, Δp_t]
         # Outputs [Δz_t]
-        out_shape = self.hparams.znum - self.hparams.pnum
+        in_shape = self.hparams.cnum + self.hparams.pnum
+        out_shape = self.hparams.cnum - self.hparams.pnum
         self.integration_net = nn.Sequential(
-            nn.Linear(self.hparams.znum, 1024, bias=False),
+            nn.Linear(in_shape, 1024, bias=False),
             nn.ReLU(),
             nn.BatchNorm1d(1024),
             nn.Dropout(0.1),
@@ -83,7 +84,7 @@ class LinearNet(pl.LightningModule):
             nn.BatchNorm1d(512),
             nn.Dropout(0.1),
 
-            nn.Linear(512, out_shape, bias=False), # Δz_t (znum-pnum): pnum is supervised
+            nn.Linear(512, out_shape, bias=False), # Δz_t (cnum-pnum): pnum is supervised
             nn.ReLU(),
             nn.BatchNorm1d(out_shape),
             nn.Dropout(0.1)
@@ -124,21 +125,28 @@ if __name__ == "__main__":
     # print(out)
 
     input_size = (1, 32)
-    input = torch.randn(input_size)
+    ct = torch.randn(input_size)
     torch.set_grad_enabled(False)
     
-    model = LinearNet(znum=32, pnum=6).eval()
+    model = LinearNet(cnum=32, pnum=6).eval()
 
-    ref_value = torch.tensor([1, 0, 1, 1, 1, 0])
+    ref_value = torch.tensor([1, 0, 0, 0, 0, 1])
     ref_value = ref_value.unsqueeze(0)
+    
     for i in range(3):
-        out = model(input)
-        print(out, out.shape)
-        out = torch.cat((out, ref_value), dim=1)
-        print(out, out.shape)
+        xt = torch.cat([ct, ref_value], dim=1)
+        print("xt", xt, xt.shape)
+        # in = [c_t, Δp_t] = [z_t, p_t, p_{t+1}-p_t]
+        dz = model(xt)
+        print("dz", dz, dz.shape)
+        # out = Δz_t
+        # z_{t+1} = z_t + Δz_t
+        z_t1 = dz + ct[:, :26]
+        #ref_val here is actually Δp_t = p_{t+1}-p_t
+        c_t1 = torch.cat((z_t1, ref_value), dim=1)
+        print("c_t1", c_t1, c_t1.shape)
 
-        input = out + input
-        print(input, input.shape)
+        ct = c_t1
         
     # out = model(input)
     # print(input, input.shape)

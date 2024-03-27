@@ -11,9 +11,9 @@ import numpy as np
 import pandas as pd
 
 class CustomDataset(Dataset):
-    def __init__(self, root, split="train", znum=32, pnum=6):
+    def __init__(self, root, split="train", cnum=32, pnum=6):
         super(CustomDataset, self).__init__()
-        self.znum = znum
+        self.cnum = cnum
         self.pnum = pnum
         self.file_path = os.path.join(root, split)
         cases = os.listdir(self.file_path)
@@ -63,12 +63,11 @@ class CustomDataset(Dataset):
             img.append(avg_pool_data)
         img = np.pad(img, ((0,0), (23,0), (47, 0)), mode="constant")
         # TODO: Normalize by channel   
-        preprocess = transforms.Compose([
-                                        #transforms.Normalize((0.0,), (0.2,))
-                                        ])
+        #norm = transforms.Normalize((),())
         
         img = torch.from_numpy(img)
-        p = torch.zeros(self.znum)
+        #img = norm(img)
+        p = torch.zeros(self.cnum)
         p[-self.pnum:] = torch.tensor(data["manhole_data"])
 
         return img.float(), p.float()

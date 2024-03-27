@@ -5,7 +5,7 @@ import torch.nn as nn
 import numpy as np
 
 class Encoder(nn.Module):
-    def __init__(self, in_c, in_shape, num_sb=4, bb_out=128, znum=16, concat=True):
+    def __init__(self, in_c, in_shape, num_sb=4, bb_out=128, cnum=16, concat=True):
         super(Encoder, self).__init__()
         # in_shape: list/tuple in BCHW format
         repeat_num = int(np.log2(np.max(in_shape[2:]))) - 2
@@ -22,7 +22,7 @@ class Encoder(nn.Module):
         reduced_dim = np.prod(np.array(in_shape[2:]) // divisor)
         reshaped_dim = reduced_dim * bb_out
 
-        self.linear = nn.Linear(reshaped_dim, znum)
+        self.linear = nn.Linear(reshaped_dim, cnum)
 
     def forward(self, x):
         x = self.first_conv(x)
@@ -32,7 +32,7 @@ class Encoder(nn.Module):
         return self.linear(x)
 
 class Decoder(nn.Module):
-    def __init__(self, out_shape, out_c=1, num_sb=4, bb_out=128, znum=16, concat=True):
+    def __init__(self, out_shape, out_c=1, num_sb=4, bb_out=128, cnum=16, concat=True):
         super(Decoder, self).__init__()
         repeat_num = int(np.log2(np.max(out_shape[2:]))) - 2
         assert(repeat_num > 0 and np.sum([i % np.power(2, repeat_num-1) for i in out_shape[2:]]) == 0)
@@ -43,7 +43,7 @@ class Decoder(nn.Module):
         reduced_dim = np.prod(np.array(out_shape[2:]) // divisor)
         reshaped_dim = reduced_dim * bb_out
         
-        self.linear = nn.Linear(znum, reshaped_dim)
+        self.linear = nn.Linear(cnum, reshaped_dim)
 
         self.big_blocks = nn.Sequential()
 
