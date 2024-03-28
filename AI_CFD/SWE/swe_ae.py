@@ -64,31 +64,23 @@ class SWE_AE(pl.LightningModule):
 
         return loss
     
-class LinearNet(pl.LightningModule):
-    def __init__(self, *, cnum=32, pnum=6, batch_size=4):
-        super(LinearNet, self).__init__()
+class ManifoldNavigator(pl.LightningModule):
+    def __init__(self, *, cnum=32, pnum=6, model_type="linear"):
+        super(ManifoldNavigator, self).__init__()
+        assert (model_type in ["linear", "lstm"]), f"{model_type} is not valid"
         self.save_hyperparameters()
-
         # Inputs [c_t, Δp_t] = [z_t, p_t, Δp_t]
         # Outputs [Δz_t]
         in_shape = self.hparams.cnum + self.hparams.pnum
         out_shape = self.hparams.cnum - self.hparams.pnum
-        self.integration_net = nn.Sequential(
-            nn.Linear(in_shape, 1024, bias=False),
-            nn.ReLU(),
-            nn.BatchNorm1d(1024),
-            nn.Dropout(0.1),
-            
-            nn.Linear(1024, 512, bias=False),
-            nn.ReLU(),
-            nn.BatchNorm1d(512),
-            nn.Dropout(0.1),
 
-            nn.Linear(512, out_shape, bias=False), # Δz_t (cnum-pnum): pnum is supervised
-            nn.ReLU(),
-            nn.BatchNorm1d(out_shape),
-            nn.Dropout(0.1)
-        )
+        match self.hparams.model_type:
+            case "linear":
+                self.integration_net = LinearNavigator(in_shape, out_shape)
+            case "lstm":
+                self.integration_net = LSTMNavigator(in_shape, out_shape)
+            case _:
+                pass
 
     def forward(self, x):
         x = self.integration_net(x)
@@ -106,6 +98,40 @@ class LinearNet(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), **self.hparams.optim_params)
         return optimizer
+    
+class LSTMNavigator(nn.Module):
+    def __init__(self, input_size, output_size):
+        super(LSTMNavigator, self).__init__()
+        self.lstm = nn.LSTM(input_size, 128)
+        self.fc = nn.Linear(128, output_size)
+
+    def forward(self, input):
+        lstm_out, _ = self.lstm(input.view(len(input), 1, -1))
+        output = self.fc(lstm_out[-1])
+        return output
+    
+class LinearNavigator(nn.Module):
+    def __init__(self, input_size, output_size):
+        super().__init__()
+        self.layers = nn.Sequential(
+            nn.Linear(input_size, 1024, bias=False),
+            nn.ReLU(),
+            nn.BatchNorm1d(1024),
+            nn.Dropout(0.1),
+            
+            nn.Linear(1024, 512, bias=False),
+            nn.ReLU(),
+            nn.BatchNorm1d(512),
+            nn.Dropout(0.1),
+
+            nn.Linear(512, output_size, bias=False), # Δz_t (cnum-pnum): pnum is supervised
+            nn.ReLU(),
+            nn.BatchNorm1d(output_size),
+            nn.Dropout(0.1)
+        )
+    
+    def forward(self, x):
+        return self.layers(x)
 
 if __name__ == "__main__":
     # input_size = (1, 1, 384, 256)
@@ -128,7 +154,7 @@ if __name__ == "__main__":
     ct = torch.randn(input_size)
     torch.set_grad_enabled(False)
     
-    model = LinearNet(cnum=32, pnum=6).eval()
+    model = ManifoldNavigator(cnum=32, pnum=6, model_type="lstm").eval()
 
     ref_value = torch.tensor([1, 0, 0, 0, 0, 1])
     ref_value = ref_value.unsqueeze(0)
@@ -144,7 +170,7 @@ if __name__ == "__main__":
         z_t1 = dz + ct[:, :26]
         #ref_val here is actually Δp_t = p_{t+1}-p_t
         c_t1 = torch.cat((z_t1, ref_value), dim=1)
-        print("c_t1", c_t1, c_t1.shape)
+        print("c_t1", c_t1, c_t1.shape, end="\n")
 
         ct = c_t1
         
