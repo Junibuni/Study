@@ -5,6 +5,7 @@ import re
 
 import torch
 from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.dataset import random_split
 from torchvision.transforms import transforms
 import lightning.pytorch as pl
 import numpy as np
@@ -56,7 +57,10 @@ class CustomDataset(Dataset):
         img = []
         for key in self.desired_order:
             file_path = data[key]
-            part_data = np.genfromtxt(file_path, skip_header=6)
+            try:
+                part_data = np.genfromtxt(file_path, skip_header=6)
+            except:
+                print("Error on Filepath", file_path)
             # replace nan
             part_data[np.isnan(part_data)] = 0.0
             avg_pool_data = self._avg_pool(part_data)
@@ -85,25 +89,29 @@ class CustomDataset(Dataset):
 #%%
 
 class DataModule(pl.LightningDataModule):
-    def __init__(self, *, dataset_root, batch_size, shuffle=True):
+    def __init__(self, *, dataset_root, batch_size, shuffle=True, train_val_test_split=(0.8, 0.1, 0.1), cnum=32, pnum=6):
         super().__init__()
         self.batch_size = batch_size
-        self.dataset_root = dataset_root
-        self.shuffle = shuffle
+        self.data = CustomDataset(dataset_root, cnum=cnum, pnum=pnum)
 
-    def prepare_data(self):
-        CustomDataset(self.dataset_root, "train")
-        CustomDataset(self.dataset_root, "test")
+        self.shuffle = shuffle
+        self.train_val_test_split = train_val_test_split
 
     def setup(self, stage):
-        self.train_set = CustomDataset(self.dataset_root, "train")
-        self.test_set = CustomDataset(self.dataset_root, "test")
+        train_size = int(self.train_val_test_split[0] * len(self.data))
+        val_size = int(self.train_val_test_split[1] * len(self.data))
+        test_size = len(self.data) - train_size - val_size
+        
+        self.train_dataset, self.val_dataset, self.test_dataset = random_split(self.data, [train_size, val_size, test_size], generator=torch.Generator().manual_seed(42))
 
     def train_dataloader(self):
-        return DataLoader(self.train_set, batch_size=self.batch_size, shuffle=True, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)
+    
+    def val_dataloader(self):
+        return DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)
     
     def test_dataloader(self):
-        return DataLoader(self.test_set, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)
+        return DataLoader(self.test_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)
 # %%
 
 # TODO    
