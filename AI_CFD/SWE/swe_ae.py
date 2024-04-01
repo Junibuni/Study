@@ -32,13 +32,22 @@ class SWE_AE(pl.LightningModule):
         out = self.decoder(latent_vec)
         return out, latent_vec
 
-    def training_step(self, batch, batch_idx):
-        x, p = batch
+    def shared_step(self, x, p):
         y_hat, latent_vec = self.forward(x)
-
-        depth_map = x.c[:, 0:1, :, :] # extract first channel
+        depth_map = x[:, 0:1, :, :] # extract first channel
         loss = self._get_loss(depth_map, y_hat, latent_vec, p)
+
+        return loss
+
+    def training_step(self, batch, batch_idx):
+        loss = self.shared_step(*batch)
         self.log_dict({'step_train_loss': loss})
+
+        return loss
+
+    def validation_step(self, val_batch, batch_idx):
+        loss = self.shared_step(*val_batch)
+        self.log_dict({'step_val_loss': loss})
 
         return loss
 
