@@ -25,6 +25,9 @@ def argument_parser():
     parser.add_argument("--dataset_pth", default=r"AI_CFD\SWE\datasets", type=str)
     parser.add_argument("--seed", default=42, type=int, dest="seed")
 
+    parser.add_argument("--cnum", default=32, type=int)
+    parser.add_argument("--pnum", default=6, type=int)
+
     return parser.parse_args()
 
 def main(args):
@@ -48,14 +51,14 @@ def main(args):
                       callbacks=[lr_monitor]
                       )
     
-    data_module = DataModule(dataset_root=args.dataset_pth, batch_size=args.batch_size)
+    data_module = DataModule(dataset_root=args.dataset_pth, batch_size=args.batch_size, cnum=args.cnum, pnum=args.pnum)
 
     model_input = dict(
         optim_params = dict(lr=args.lr, betas=(0.9, 0.999)),
         scheduler_params = dict(T_max=100),
         input_size = (args.batch_size, 4, 384, 256),
-        cnum = 32,
-        pnum = 6,
+        cnum = args.cnum,
+        pnum = args.pnum,
         in_c = 3,
         out_c = 1,
         loss_ratio = [1., 1., 1.]
