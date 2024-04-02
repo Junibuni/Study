@@ -2,12 +2,16 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 
-def unnormalize(tensor, mean, std):
-        copy_tensor = tensor.clone()
-        for i in range(copy_tensor.shape[1]):
-            copy_tensor[:, i] = copy_tensor[:, i] * std[i] + mean[i]
+def norm_p(p, mean=0.2188, std=0.6068):
+    normalized_p = (p - mean) / std
+    return normalized_p
 
-        return copy_tensor
+def unnormalize(tensor, mean, std):
+    copy_tensor = tensor.clone()
+    for i in range(copy_tensor.shape[1]):
+        copy_tensor[:, i] = copy_tensor[:, i] * std[i] + mean[i]
+
+    return copy_tensor
 
 def depth_gradient(depth_map):
     depth_tensor = depth_map.clone().detach()

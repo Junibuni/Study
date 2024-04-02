@@ -11,6 +11,8 @@ import lightning.pytorch as pl
 import numpy as np
 import pandas as pd
 
+from utils import norm_p
+
 class CustomDataset(Dataset):
     def __init__(self, root, split="train", cnum=32, pnum=6):
         super(CustomDataset, self).__init__()
@@ -57,23 +59,23 @@ class CustomDataset(Dataset):
         img = []
         for key in self.desired_order:
             file_path = data[key]
-            try:
-                part_data = np.genfromtxt(file_path, skip_header=6)
-            except:
-                print("Error on Filepath", file_path)
+            part_data = np.genfromtxt(file_path, skip_header=6)
             # replace nan
             part_data[np.isnan(part_data)] = 0.0
             avg_pool_data = self._avg_pool(part_data)
             img.append(avg_pool_data)
         img = np.pad(img, ((0,0), (23,0), (47, 0)), mode="constant")
         # TODO: Normalize by channel   
-        #norm = transforms.Normalize((),())
-        
+        norm_img = transforms.Normalize((0.0059, 0.0004, -0.0045),(0.0198, 0.0300, 0.0297))
+
         img = torch.from_numpy(img)
-        #img = norm(img)
+        
         p = torch.zeros(self.cnum)
         p[-self.pnum:] = torch.tensor(data["manhole_data"])
-
+        
+        img = norm_img(img)
+        #TODO: norm_p ?
+        p = norm_p(p)
         return img.float(), p.float()
     
     def __len__(self):
@@ -105,7 +107,7 @@ class DataModule(pl.LightningDataModule):
         self.train_dataset, self.val_dataset, self.test_dataset = random_split(self.data, [train_size, val_size, test_size], generator=torch.Generator().manual_seed(42))
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=self.shuffle, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)
     
     def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)
