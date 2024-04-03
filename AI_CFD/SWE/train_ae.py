@@ -17,7 +17,7 @@ def argument_parser():
     parser.add_argument("--mode", default="train", choices=["train", "test"], type=str)
     parser.add_argument("--lr", default=2e-4, type=float)
     parser.add_argument("--batch_size", default=4, type=int)
-    parser.add_argument("--num_epoch", default=150, type=int)
+    parser.add_argument("--num_epoch", default=5, type=int)
     parser.add_argument("--device", default="gpu", type=str)
     parser.add_argument("--precision", default="16-mixed", type=str)
     parser.add_argument("--max_train_batch", default=1.0, type=float) #for test (ratio)
@@ -34,7 +34,7 @@ def main(args):
     torch.set_float32_matmul_precision("medium")
     seed_everything(args.seed)
 
-    version_name = "ae"
+    version_name = "StepLR"
     csv_logger = CSVLogger(args.log_pth, name="CSVLogger", version=version_name)
     tb_logger = TensorBoardLogger(save_dir=args.log_pth, name="TBLogger", version=version_name)
 
@@ -61,7 +61,7 @@ def main(args):
         pnum = args.pnum,
         in_c = 3,
         out_c = 1,
-        loss_ratio = [1., 1., 1.]
+        loss_ratio = [0.2, 0.1, 10.] #mse, grad, latentvec
     )
 
     model = SWE_AE(**model_input)

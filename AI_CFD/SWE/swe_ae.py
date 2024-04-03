@@ -3,7 +3,7 @@ from collections import deque
 
 import torch
 import torch.nn as nn
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, OneCycleLR, MultiStepLR
 import torch.nn.functional as F
 import torchvision
 from torchmetrics import Accuracy, Precision, Recall, F1Score
@@ -14,7 +14,7 @@ from models import Encoder, Decoder
 from utils import depth_gradient_loss
 
 class SWE_AE(pl.LightningModule):
-    def __init__(self, *, optim_params, scheduler_params, input_size, mode="ae", cnum=16, pnum=2, in_c=1, out_c=1, loss_ratio=[1., 1., 0.5]):
+    def __init__(self, *, optim_params, scheduler_params, input_size, mode="ae", cnum=32, pnum=6, in_c=3, out_c=1, loss_ratio=[1., 1., 1.0]):
         # mode: ae, comp, sim
         super(SWE_AE, self).__init__()
         self.save_hyperparameters()
@@ -53,9 +53,12 @@ class SWE_AE(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), **self.hparams.optim_params)
-        scheduler = CosineAnnealingLR(optimizer=optimizer, **self.hparams.scheduler_params) # no need to monitor
-
-        return {"optimizer": optimizer, "lr_scheduler": scheduler}
+        #scheduler = CosineAnnealingLR(optimizer=optimizer, **self.hparams.scheduler_params) # no need to monitor
+        scheduler = {
+            'scheduler': OneCycleLR(optimizer, max_lr=1e-4, total_steps=self.trainer.estimated_stepping_batches),
+            'interval': 'step'
+        }
+        return [optimizer], [scheduler]
 
     def _get_loss(self, y, y_hat, latent_vec, p):
         mse_loss = F.mse_loss(y, y_hat, reduction="sum") # mass conservation

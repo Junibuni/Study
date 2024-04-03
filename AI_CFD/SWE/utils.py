@@ -6,10 +6,12 @@ def norm_p(p, mean=0.2188, std=0.6068):
     normalized_p = (p - mean) / std
     return normalized_p
 
-def unnormalize(tensor, mean, std):
+def unnormalize(tensor):
+    #mean, std = (0.0059, 0.0004, -0.0045),(0.0198, 0.0300, 0.0297)
+    mean, std = 0.0059,0.0198
     copy_tensor = tensor.clone()
     for i in range(copy_tensor.shape[1]):
-        copy_tensor[:, i] = copy_tensor[:, i] * std[i] + mean[i]
+        copy_tensor[:, i] = copy_tensor[:, i] * std + mean
 
     return copy_tensor
 
