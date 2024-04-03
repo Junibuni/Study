@@ -36,6 +36,8 @@ class CustomDataset(Dataset):
                 n = os.path.splitext(basename)[0]
                 file_type, file_number = n.split('_')
                 case_name = os.path.split(dirname)[1]
+                if int(case_name) % 10 != 2:
+                    continue
 
                 manhole_duration = (int(case_name)%10)*120
                 if int(file_number) < manhole_duration:
