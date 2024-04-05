@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from utils import unnormalize
 
-ckpt_pth = r"AI_CFD\SWE\logs\CSVLogger\norm_p\checkpoints\epoch=4-step=19440.ckpt"
+ckpt_pth = r"AI_CFD\SWE\logs\CSVLogger\loss_scale\checkpoints\epoch=4-step=19440.ckpt"
 checkpoint = torch.load(ckpt_pth)
 
 model_input = dict(
@@ -34,7 +34,10 @@ data = CustomDataset(r"AI_CFD\SWE\datasets")
 #         torch.save(tensor, fr'AI_CFD\SWE\datasets\linear_net\tensor_{i}.pt')
 
 img = data[264][0]
+with torch.no_grad():
+    print(model.encoder(img.unsqueeze(0)))
 
+quit()
 
 import matplotlib.pyplot as plt
 with torch.no_grad():
