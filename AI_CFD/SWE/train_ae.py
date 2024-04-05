@@ -17,12 +17,13 @@ def argument_parser():
     parser.add_argument("--mode", default="train", choices=["train", "test"], type=str)
     parser.add_argument("--lr", default=2e-4, type=float)
     parser.add_argument("--batch_size", default=4, type=int)
-    parser.add_argument("--num_epoch", default=5, type=int)
+    parser.add_argument("--num_epoch", default=10, type=int)
     parser.add_argument("--device", default="gpu", type=str)
     parser.add_argument("--precision", default="16-mixed", type=str)
     parser.add_argument("--max_train_batch", default=1.0, type=float) #for test (ratio)
     parser.add_argument("--log_step", default=10, type=int)
     parser.add_argument("--dataset_pth", default=r"AI_CFD\SWE\datasets", type=str)
+    parser.add_argument("--ckpt_pth", default=r"", type=str)
     parser.add_argument("--seed", default=42, type=int, dest="seed")
 
     parser.add_argument("--cnum", default=32, type=int)
@@ -34,7 +35,7 @@ def main(args):
     torch.set_float32_matmul_precision("medium")
     seed_everything(args.seed)
 
-    version_name = "StepLR"
+    version_name = "StepLR_huber_all_notnorm_p"
     csv_logger = CSVLogger(args.log_pth, name="CSVLogger", version=version_name)
     tb_logger = TensorBoardLogger(save_dir=args.log_pth, name="TBLogger", version=version_name)
 
@@ -55,7 +56,7 @@ def main(args):
 
     model_input = dict(
         optim_params = dict(lr=args.lr, betas=(0.9, 0.999)),
-        scheduler_params = dict(T_max=100),
+        scheduler_params = dict(step_size=1, gamma=0.5),
         input_size = (args.batch_size, 4, 384, 256),
         cnum = args.cnum,
         pnum = args.pnum,
@@ -66,7 +67,10 @@ def main(args):
 
     model = SWE_AE(**model_input)
     print("Train")
-    trainer.fit(model=model, datamodule=data_module)
+    if args.mode == "train":
+        trainer.fit(model=model, datamodule=data_module)
+    elif args.mode == "test":
+        trainer.test(model=model, datamodule=data_module, ckpt_path=args.ckpt_pth)
     
 if __name__ == "__main__":
     args = argument_parser()

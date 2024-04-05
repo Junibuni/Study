@@ -43,7 +43,7 @@ def depth_gradient_loss(target_depth, output_depth):
     target_gradients = depth_gradient(target_depth)
     output_gradients = depth_gradient(output_depth)
 
-    loss = F.l1_loss(target_gradients, output_gradients)
+    loss = F.huber_loss(target_gradients, output_gradients)
 
     return loss
 

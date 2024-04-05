@@ -3,7 +3,7 @@ from collections import deque
 
 import torch
 import torch.nn as nn
-from torch.optim.lr_scheduler import CosineAnnealingLR, OneCycleLR, MultiStepLR
+from torch.optim.lr_scheduler import CosineAnnealingLR, OneCycleLR, StepLR
 import torch.nn.functional as F
 import torchvision
 from torchmetrics import Accuracy, Precision, Recall, F1Score
@@ -32,47 +32,53 @@ class SWE_AE(pl.LightningModule):
         out = self.decoder(latent_vec)
         return out, latent_vec
 
-    def shared_step(self, x, p):
+    def shared_step(self, x, p, mode):
         y_hat, latent_vec = self.forward(x)
         depth_map = x[:, 0:1, :, :] # extract first channel
-        loss = self._get_loss(depth_map, y_hat, latent_vec, p)
+        loss = self._get_loss(depth_map, y_hat, latent_vec, p, mode)
 
         return loss
 
     def training_step(self, batch, batch_idx):
-        loss = self.shared_step(*batch)
+        loss = self.shared_step(*batch, mode="train")
         self.log_dict({'step_train_loss': loss})
 
         return loss
 
     def validation_step(self, val_batch, batch_idx):
-        loss = self.shared_step(*val_batch)
+        loss = self.shared_step(*val_batch, mode="val")
         self.log_dict({'step_val_loss': loss})
+
+        return loss
+    
+    def test_step(self, test_batch, batch_idx, dataloader_idx=0):
+        loss = self.shared_step(*test_batch, mode="test")
+        self.log_dict({'step_test_loss': loss})
 
         return loss
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), **self.hparams.optim_params)
         #scheduler = CosineAnnealingLR(optimizer=optimizer, **self.hparams.scheduler_params) # no need to monitor
-        scheduler = {
-            'scheduler': OneCycleLR(optimizer, max_lr=1e-4, total_steps=self.trainer.estimated_stepping_batches),
-            'interval': 'step'
-        }
+        scheduler = StepLR(optimizer, **self.hparams.scheduler_params)
+
         return [optimizer], [scheduler]
 
-    def _get_loss(self, y, y_hat, latent_vec, p):
-        mse_loss = F.mse_loss(y, y_hat, reduction="sum") # mass conservation
+    def _get_loss(self, y, y_hat, latent_vec, p, mode):
+        #mse_loss = F.mse_loss(y, y_hat, reduction="sum") # mass conservation
+        mse_loss = F.huber_loss(y, y_hat, reduction="sum")
         grad_loss = depth_gradient_loss(y, y_hat)
 
         p = p * self.mask
         latent_vec = latent_vec * self.mask
-        latent_vec_loss = torch.mean((p - latent_vec) ** 2)
+        latent_vec_loss = F.huber_loss(latent_vec, p, reduction="mean")
         
         ratio = self.hparams.loss_ratio
         loss = ratio[0]*mse_loss + ratio[1]*grad_loss + ratio[2]*latent_vec_loss
 
         # logging multitask learning
-        self.log_dict({'mse_loss': mse_loss, 'grad_loss': grad_loss, 'latent_vec_loss': latent_vec_loss})
+        if mode in ["train", "test"]:
+            self.log_dict({'mse_loss': mse_loss, 'grad_loss': grad_loss, 'latent_vec_loss': latent_vec_loss})
 
         return loss
     
