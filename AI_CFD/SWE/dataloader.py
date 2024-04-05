@@ -55,7 +55,7 @@ class CustomDataset(Dataset):
                 self.grouped_files.append(file_dict)
         
         self.desired_order = ['depth', 'xvel', 'yvel']
-
+        #self.grouped_files = np.random.choice(self.grouped_files, size=int(len(self.grouped_files)*0.6), replace=False)
     def __getitem__(self, index):
         data = self.grouped_files[index]
         img = []
@@ -77,7 +77,7 @@ class CustomDataset(Dataset):
         
         img = norm_img(img)
         #TODO: norm_p ?
-        p = norm_p(p)
+        #p = norm_p(p)
         return img.float(), p.float()
     
     def __len__(self):
