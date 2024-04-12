@@ -40,20 +40,27 @@ def depth_gradient(depth_map):
     return gradient_vectors
 
 def depth_gradient_loss(target_depth, output_depth):
-    target_gradients = depth_gradient(target_depth)
-    output_gradients = depth_gradient(output_depth)
+    # target_gradients = depth_gradient(target_depth)
+    # output_gradients = depth_gradient(output_depth)
 
-    loss = F.huber_loss(target_gradients, output_gradients)
+    # loss = F.huber_loss(output_gradients, target_gradients)
+    dy_true, dx_true = torch.gradient(target_depth)
+    dy_pred, dx_pred = torch.gradient(output_depth)
+    
+    dy_diff = (dy_true - dy_pred)**2
+    dx_diff = (dx_true - dx_pred)**2
+    
+    loss = torch.mean(dy_diff + dx_diff)
 
     return loss
 
 if __name__ == "__main__":
-    target_depth_map = torch.tensor([[[[1, 2, 3],
+    target_depth_map = torch.tensor([[1, 2, 3],
                                 [4, 5, 6],
-                                [7, 8, 9]]]], dtype=torch.float32)
-    output_depth_map = torch.tensor([[[[1, 2, 3],
+                                [7, 8, 9]], dtype=torch.float32)
+    output_depth_map = torch.tensor([[1, 2, 3],
                                 [4, 5, 6],
-                                [7, 8, 9.01]]]], dtype=torch.float32)
+                                [7, 8, 9.01]], dtype=torch.float32)
     
     loss = depth_gradient_loss(target_depth_map, output_depth_map)
     print("L1 Depth Gradient Loss:", loss.item())
