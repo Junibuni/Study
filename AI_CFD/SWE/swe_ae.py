@@ -27,13 +27,15 @@ class SWE_AE(pl.LightningModule):
         mask = torch.tensor(mask, dtype=torch.float32)
         self.register_buffer("mask", mask)
 
-    def forward(self, x):
+    def forward(self, x, p):
         latent_vec = self.encoder(x)
-        out = self.decoder(latent_vec)
+        lv_copy = latent_vec.clone().detach()
+        lv_copy[:, -self.hparams.pnum:] = p[:, -self.hparams.pnum:]
+        out = self.decoder(lv_copy)
         return out, latent_vec
 
     def shared_step(self, x, p, mode):
-        y_hat, latent_vec = self.forward(x)
+        y_hat, latent_vec = self.forward(x, p)
         depth_map = x[:, 0:1, :, :] # extract first channel
         loss = self._get_loss(depth_map, y_hat, latent_vec, p, mode)
 
