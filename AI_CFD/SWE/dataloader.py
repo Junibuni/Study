@@ -14,11 +14,12 @@ import pandas as pd
 from utils import norm_p
 
 class CustomDataset(Dataset):
-    def __init__(self, root, split="train", cnum=32, pnum=6):
+    def __init__(self, root, split="train", cnum=32, pnum=6, *, normp=False):
         super(CustomDataset, self).__init__()
         self.cnum = cnum
         self.pnum = pnum
-        self.file_path = os.path.join(root, split)
+        self.normp = normp
+        self.file_path = os.path.join(root, "train")
         cases = os.listdir(self.file_path)
 
         csv_file_path = os.path.join(root, "case_data.csv")
@@ -36,8 +37,8 @@ class CustomDataset(Dataset):
                 n = os.path.splitext(basename)[0]
                 file_type, file_number = n.split('_')
                 case_name = os.path.split(dirname)[1]
-                if int(case_name) % 10 != 2:
-                    continue
+                # if int(case_name) % 10 != 2:
+                #     continue
 
                 manhole_duration = (int(case_name)%10)*120
                 if int(file_number) < manhole_duration:
@@ -76,8 +77,8 @@ class CustomDataset(Dataset):
         p[-self.pnum:] = torch.tensor(data["manhole_data"])
         
         img = norm_img(img)
-        #TODO: norm_p ?
-        #p = norm_p(p)
+        if self.normp:
+            p = norm_p(p)
         return img.float(), p.float()
     
     def __len__(self):
@@ -93,10 +94,10 @@ class CustomDataset(Dataset):
 #%%
 
 class DataModule(pl.LightningDataModule):
-    def __init__(self, *, dataset_root, batch_size, shuffle=True, train_val_test_split=(0.8, 0.1, 0.1), cnum=32, pnum=6):
+    def __init__(self, *, dataset_root, batch_size, shuffle=True, train_val_test_split=(0.8, 0.1, 0.1), cnum=32, pnum=6, normp=False):
         super().__init__()
         self.batch_size = batch_size
-        self.data = CustomDataset(dataset_root, cnum=cnum, pnum=pnum)
+        self.data = CustomDataset(dataset_root, cnum=cnum, pnum=pnum, normp=normp)
 
         self.shuffle = shuffle
         self.train_val_test_split = train_val_test_split

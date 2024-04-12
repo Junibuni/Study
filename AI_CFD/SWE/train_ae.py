@@ -35,7 +35,7 @@ def main(args):
     torch.set_float32_matmul_precision("medium")
     seed_everything(args.seed)
 
-    version_name = "StepLR_huber_all_notnorm_p"
+    version_name = "detach_normp"
     csv_logger = CSVLogger(args.log_pth, name="CSVLogger", version=version_name)
     tb_logger = TensorBoardLogger(save_dir=args.log_pth, name="TBLogger", version=version_name)
 
@@ -52,7 +52,7 @@ def main(args):
                       callbacks=[lr_monitor]
                       )
     
-    data_module = DataModule(dataset_root=args.dataset_pth, batch_size=args.batch_size, cnum=args.cnum, pnum=args.pnum)
+    data_module = DataModule(dataset_root=args.dataset_pth, batch_size=args.batch_size, cnum=args.cnum, pnum=args.pnum, normp=True)
 
     model_input = dict(
         optim_params = dict(lr=args.lr, betas=(0.9, 0.999)),
