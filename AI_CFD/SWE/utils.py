@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
@@ -14,6 +15,15 @@ def unnormalize(tensor):
         copy_tensor[:, i] = copy_tensor[:, i] * std + mean
 
     return copy_tensor
+
+def set_model_mode(model, mode='train'):
+    if mode == 'inference':
+        for module in model.modules():
+            if isinstance(module, nn.BatchNorm2d) or isinstance(module, nn.BatchNorm1d):
+                module.track_running_stats = False
+    else:
+        raise ValueError("Invalid mode")
+
 
 def depth_gradient(depth_map):
     depth_tensor = depth_map.clone().detach()

@@ -11,8 +11,7 @@ class Encoder(nn.Module):
         repeat_num = int(np.log2(np.max(in_shape[2:]))) - 2
         assert(repeat_num > 0 and np.sum([i % np.power(2, repeat_num-1) for i in in_shape[2:]]) == 0)
 
-        self.first_conv = nn.Conv2d(in_c, 128, kernel_size=3, stride=1, padding=1, bias=False) # match channel to 128
-        self.bnorm = nn.BatchNorm2d(128)
+        self.first_conv = nn.Conv2d(in_c, 128, kernel_size=3, stride=1, padding=1, bias=True) # match channel to 128
         self.big_blocks = nn.Sequential()
 
         self.big_blocks.add_module("big_block_0", BigBlock(128, bb_out, num_small_block=num_sb, type="encoder"))
@@ -24,16 +23,13 @@ class Encoder(nn.Module):
         reshaped_dim = reduced_dim * bb_out
 
         self.linear = nn.Linear(reshaped_dim, cnum)
-        self.linear_bnorm = nn.BatchNorm1d(cnum)
 
     def forward(self, x):
         x = self.first_conv(x)
-        x = self.bnorm(x)
         x = self.big_blocks(x)
         x = x.view(x.size(0), -1)
-        x = self.linear(x)
         
-        return self.linear_bnorm(x)
+        return self.linear(x)
 
 class Decoder(nn.Module):
     def __init__(self, out_shape, out_c=1, num_sb=4, bb_out=128, cnum=16, concat=True):
@@ -48,34 +44,30 @@ class Decoder(nn.Module):
         reshaped_dim = reduced_dim * bb_out
         
         self.linear = nn.Linear(cnum, reshaped_dim)
-        self.linear_bnorm = nn.BatchNorm1d(reshaped_dim)
+
         self.big_blocks = nn.Sequential()
 
         self.big_blocks.add_module("big_block_0", BigBlock(128, bb_out, num_small_block=num_sb, type="decoder"))
         for i in range(1, repeat_num):
             self.big_blocks.add_module(f"big_block_{i}", BigBlock(bb_out, bb_out, num_small_block=num_sb, type="decoder"))
 
-        self.last_conv = nn.Conv2d(bb_out, out_c, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bnorm = nn.BatchNorm2d(out_c)
+        self.last_conv = nn.Conv2d(bb_out, out_c, kernel_size=3, stride=1, padding=1, bias=True)
 
     def forward(self, x):
         x = self.linear(x)
-        x = self.linear_bnorm(x)
         x = x.view(self.x0_shape)
         x = self.big_blocks(x)
-        x = self.last_conv(x)
-        return self.bnorm(x)
+        
+        return self.last_conv(x)
 
 class SmallBlock(nn.Module):
     def __init__(self, in_c, out_c=128):
         super(SmallBlock, self).__init__()
-        self.up_conv = nn.Conv2d(in_c, out_c, kernel_size=3, stride=1, padding=1, bias=False)
+        self.up_conv = nn.Conv2d(in_c, out_c, kernel_size=3, stride=1, padding=1, bias=True)
         self.l_relu = nn.LeakyReLU()
-        self.bnorm = nn.BatchNorm2d(out_c)
 
     def forward(self, x):
         x = self.up_conv(x)
-        x = self.bnorm(x)
         return self.l_relu(x)
     
 class BigBlock(nn.Module):
@@ -96,10 +88,9 @@ class BigBlock(nn.Module):
         # channel size: 128+in_c
         match type:
             case "encoder": #conv
-                self.pool = nn.Conv2d(128+in_c, out_c, kernel_size=3, stride=2, padding=1, bias=False)
+                self.pool = nn.Conv2d(128+in_c, out_c, kernel_size=3, stride=2, padding=1, bias=True)
             case "decoder": #upconv
-                self.pool = nn.ConvTranspose2d(128+in_c, out_c, kernel_size=4, stride=2, padding=1, bias=False)
-        self.bnorm = nn.BatchNorm2d(out_c)
+                self.pool = nn.ConvTranspose2d(128+in_c, out_c, kernel_size=4, stride=2, padding=1, bias=True)
     
     def forward(self, x):
         x0 = x
@@ -107,7 +98,7 @@ class BigBlock(nn.Module):
         x = torch.concat([x, x0], dim=1)
 
         x = self.pool(x)
-        return self.bnorm(x)
+        return x
 
 
         

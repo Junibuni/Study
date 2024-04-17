@@ -8,18 +8,18 @@ from tqdm import tqdm
 from utils import unnormalize
 import matplotlib.pyplot as plt
 
-ckpt_pth = r"AI_CFD\SWE\logs\CSVLogger\detach\checkpoints\epoch=9-step=12960.ckpt"
-checkpoint = torch.load(ckpt_pth)
+# ckpt_pth = r"AI_CFD\SWE\logs\CSVLogger\detach\checkpoints\epoch=9-step=12960.ckpt"
+# checkpoint = torch.load(ckpt_pth)
 
-model_input = dict(
-    optim_params = dict(lr=2e-4),
-    scheduler_params = dict(),
-    input_size = (1, 3, 384, 256)
-)
-model = SWE_AE(**model_input)
-model.load_state_dict(checkpoint['state_dict'])
-model.eval()
-model.to("cuda")
+# model_input = dict(
+#     optim_params = dict(lr=2e-4),
+#     scheduler_params = dict(),
+#     input_size = (1, 3, 384, 256)
+# )
+# model = SWE_AE(**model_input)
+# model.load_state_dict(checkpoint['state_dict'])
+# model.eval()
+# model.to("cuda")
 
 data = CustomDataset(r"AI_CFD\SWE\datasets")
 
@@ -50,14 +50,15 @@ if anim:
 
     def get_frame(i):
         with torch.no_grad():
-            _img = data[i][0].to("cuda")
-            _lv = data[i][1].to("cuda")
-            lv = model.encoder(_img.unsqueeze(0))
+            _img = data[i][0]
+            # _lv = data[i][1].to("cuda")
+            # lv = model.encoder(_img.unsqueeze(0))
             
-            # lv[:, -6:] = _lv[-6:]
+            # # lv[:, -6:] = _lv[-6:]
             
-            result = model.decoder(lv)
-            result = unnormalize(result[0]).cpu().numpy().squeeze()[23:, 47:-2]
+            # result = model.decoder(lv)
+            #result = unnormalize(result[0]).cpu().numpy().squeeze()[23:, 47:-2]
+            result = unnormalize(_img[0]).numpy().squeeze()[23:, 47:-2]
         return result
 
 
@@ -76,7 +77,7 @@ if anim:
     from matplotlib.animation import FuncAnimation
     ani = FuncAnimation(fig, update, frames=len(data), interval=100, blit=True)
 
-    animation_filename = "333_original.gif"
+    animation_filename = "333_original_real.gif"
     ani.save(animation_filename, writer='pillow')
 
 
