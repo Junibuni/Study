@@ -14,11 +14,12 @@ import pandas as pd
 from utils import norm_p
 
 class CustomDataset(Dataset):
-    def __init__(self, root, split="train", cnum=32, pnum=6, *, normp=False):
+    def __init__(self, root, split="train", cnum=32, pnum=6, *, norm=True, normp=False):
         super(CustomDataset, self).__init__()
         self.cnum = cnum
         self.pnum = pnum
         self.normp = normp
+        self.norm = norm
         self.file_path = os.path.join(root, "train")
         cases = os.listdir(self.file_path)
 
@@ -51,6 +52,7 @@ class CustomDataset(Dataset):
 
                 file_groups.setdefault(file_number, {}).setdefault(file_type, filename)
                 file_groups[file_number]["manhole_data"] = manhole_data
+                file_groups[file_number]["case_num"] = int(case_name)
 
             for file_number, file_dict in file_groups.items():
                 self.grouped_files.append(file_dict)
@@ -67,16 +69,16 @@ class CustomDataset(Dataset):
             part_data[np.isnan(part_data)] = 0.0
             avg_pool_data = self._avg_pool(part_data)
             img.append(avg_pool_data)
-        img = np.pad(img, ((0,0), (23,0), (47, 0)), mode="constant")
-        # TODO: Normalize by channel   
-        norm_img = transforms.Normalize((0.0059, 0.0004, -0.0045),(0.0198, 0.0300, 0.0297))
+        img = np.pad(img, ((0,0), (23,0), (47, 0)), mode="constant") 
 
         img = torch.from_numpy(img)
         
         p = torch.zeros(self.cnum)
         p[-self.pnum:] = torch.tensor(data["manhole_data"])
         
-        img = norm_img(img)
+        if self.norm:
+            norm_img = transforms.Normalize((0.0059, 0.0004, -0.0045),(0.0198, 0.0300, 0.0297))
+            img = norm_img(img)
         if self.normp:
             p = norm_p(p)
         return img.float(), p.float()
@@ -121,4 +123,27 @@ class DataModule(pl.LightningDataModule):
 
 # TODO    
 class LinearDataSet(Dataset):
-    pass
+    def __init__(self, root_dir, seqlen=30, pnum=6):
+        super(LinearDataSet, self).__init__()
+        self.root_dir = root_dir
+        self.seqlen = seqlen
+        self.pnum = pnum
+        self.file_list = os.listdir(root_dir)
+
+    def __len__(self):
+        return len(self.file_list)
+
+    def __getitem__(self, idx):
+        file_name = os.path.join(self.root_dir, self.file_list[idx])
+        data = np.load(file_name)  
+        num_frames = data.shape[0]
+
+        start_index = np.random.randint(0, num_frames - self.sequence_length)
+
+        sequence = data[start_index:start_index+self.sequence_length]
+        target = data[start_index+self.sequence_length][:-self.pnum]
+
+        sequence_tensor = torch.tensor(sequence, dtype=torch.float32)
+        target_tensor = torch.tensor(target, dtype=torch.float32)
+
+        return sequence_tensor, target_tensor
