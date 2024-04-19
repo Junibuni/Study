@@ -100,7 +100,9 @@ class ManifoldNavigator(pl.LightningModule):
             case "lstm":
                 self.integration_net = LSTMNavigator(in_shape, out_shape)
             case _:
-                pass
+                raise NotImplementedError(f"model not implementd")
+        
+        self.loss = nn.MSELoss()
 
     def forward(self, x):
         x = self.integration_net(x)
@@ -108,9 +110,10 @@ class ManifoldNavigator(pl.LightningModule):
     
     def training_step(self, batch, batch_idx):
         # loss =  1/30 sum L2(Δz_t - T(x))
-        # get 30 data as batch, yhat for 31st data
-        
-        # TODO
+        input_data, target_data = batch
+        output = self(input_data)
+        loss = self.loss(output, target_data)
+
         self.log_dict({'step_train_loss': loss})
 
         return loss
@@ -122,10 +125,11 @@ class ManifoldNavigator(pl.LightningModule):
 class LSTMNavigator(nn.Module):
     def __init__(self, input_size, output_size):
         super(LSTMNavigator, self).__init__()
-        self.lstm = nn.LSTM(input_size, 128)
+        self.lstm = nn.LSTM(input_size, 128, batch_first=True)
         self.fc = nn.Linear(128, output_size)
 
     def forward(self, input):
+        # lstm_out = (batch_size, seq_len, hidden_size)
         lstm_out, _ = self.lstm(input.view(len(input), 1, -1))
         output = self.fc(lstm_out[-1])
         return output
