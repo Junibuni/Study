@@ -11,7 +11,7 @@ from tqdm import tqdm
 from utils import unnormalize
 import matplotlib.pyplot as plt
 
-ckpt_pth = r"AI_CFD\SWE\logs\CSVLogger\detach\checkpoints\epoch=9-step=12960.ckpt"
+ckpt_pth = r"D:\epoch=99-step=24300.ckpt"
 checkpoint = torch.load(ckpt_pth)
 
 model_input = dict(
@@ -24,7 +24,7 @@ model.load_state_dict(checkpoint['state_dict'])
 model.eval()
 model.to("cuda")
 
-data = CustomDataset(r"AI_CFD\SWE\datasets")
+data = CustomDataset(r"AI_CFD\SWE\datasets", normp=True)
 
 def extract_last_number(filename):
     return int(re.findall(r'\d+', filename.split('\\')[-1])[-1])
@@ -39,20 +39,22 @@ def group_and_sort_by_depth_last_number(data):
 
 sorted_data = group_and_sort_by_depth_last_number(data.grouped_files)
 save_data_pth = r"AI_CFD\SWE\datasets\linear"
-for i in range(6):
-    for j in range(3):
-        for k in range(3):
+for i in range(1, 7):
+    for j in range(1, 4):
+        for k in range(1, 4):
             case_num = int(str(i)+str(j)+str(k))
             savepth = os.path.join(save_data_pth, f"{case_num}.npy")
             data.grouped_files = sorted_data[case_num]
 
             lvec_stack = []
-            for i in tqdm(range(len(data))):
+            for idx in tqdm(range(len(data)), desc=f"{case_num}"):
                 with torch.no_grad():
-                    _img = data[i][0].to("cuda")
-                    # _lv = data[i][1].to("cuda")
-                    #depend on the model , whether concat or modify the last 6
+                    _img = data[idx][0].to("cuda")
+                    _lv = data[idx][1].to("cuda")
                     lv = model.encoder(_img.unsqueeze(0))
+
+                    lv = torch.concat((lv, _lv[-6:].unsqueeze(0)), dim=1)
+
                     a = np.array(lv.squeeze().cpu())
                     lvec_stack.append(a)
             np.save(savepth, lvec_stack)

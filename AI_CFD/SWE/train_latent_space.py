@@ -7,23 +7,26 @@ from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import CSVLogger, TensorBoardLogger
 from lightning.pytorch.callbacks import LearningRateMonitor
 
-from dataloader import DataModule
-from swe_ae import SWE_AE, CombinedModel
+from dataloader import LinearDataModule
+from swe_ae import ManifoldNavigator
 
 def argument_parser():
     parser = argparse.ArgumentParser(description="AI-SWE")
 
     parser.add_argument("--log_pth", default="AI_CFD\SWE\logs", type=str)
     parser.add_argument("--mode", default="train", choices=["train", "test"], type=str)
-    parser.add_argument("--lr", default=2e-4, type=float)
-    parser.add_argument("--batch_size", default=4, type=int)
-    parser.add_argument("--num_epoch", default=300, type=int)
+    parser.add_argument("--lr", default=2e-3, type=float)
+    parser.add_argument("--batch_size", default=16, type=int)
+    parser.add_argument("--num_epoch", default=100000, type=int)
     parser.add_argument("--device", default="gpu", type=str)
     parser.add_argument("--precision", default="16-mixed", type=str)
     parser.add_argument("--max_train_batch", default=1.0, type=float) #for test (ratio)
-    parser.add_argument("--log_step", default=10, type=int)
+    parser.add_argument("--log_step", default=1, type=int)
     parser.add_argument("--dataset_pth", default=r"AI_CFD\SWE\datasets", type=str)
     parser.add_argument("--seed", default=42, type=int, dest="seed")
+    parser.add_argument("--cnum", default=32, type=int, dest="cnum")
+    parser.add_argument("--pnum", default=6, type=int, dest="pnum")
+
 
     return parser.parse_args()
 
@@ -31,9 +34,9 @@ def main(args):
     torch.set_float32_matmul_precision("medium")
     seed_everything(args.seed)
 
-    version_name = "latent_space"
-    csv_logger = CSVLogger(args.log_pth, name="CSVLogger", version=version_name)
-    tb_logger = TensorBoardLogger(save_dir=args.log_pth, name="TBLogger", version=version_name)
+    version_name = "linear"
+    csv_logger = CSVLogger(args.log_pth, name="latnet\CSVLogger", version=version_name)
+    tb_logger = TensorBoardLogger(save_dir=args.log_pth, name="latnet\TBLogger", version=version_name)
 
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
@@ -49,26 +52,26 @@ def main(args):
                       )
     
     #perhaps sorting?
-    data_module = DataModule(dataset_root=args.dataset_pth, batch_size=args.batch_size)
-
-    ckpt_pth = ""
-    checkpoint = torch.load(ckpt_pth)
-    AE_model_input = dict(
+    data_module = LinearDataModule(data_dir=args.dataset_pth, batch_size=args.batch_size, seqlen=350)
+    
+    model_input = dict(
         optim_params = dict(lr=args.lr),
-        criterion_params = dict(), 
-        scheduler_params = dict(T_max=100),
-        input_size = (args.batch_size, 1, 384, 256),
-        mode = "comp"
+        scheduler_params = dict(first_cycle_steps = 20,
+                                cycle_mult = 1,
+                                max_lr = args.lr,
+                                min_lr = 1e-6,
+                                warmup_steps = 2,
+                                gamma = 0.5,
+                                last_epoch = -1,),
+        cnum = args.cnum,
+        pnum = args.pnum,
+        model_type = "lstm",
+        batch_size=args.batch_size,
+        hidden_shape = 64,
+        dropout = 0.2
     )
-    AE_model = SWE_AE(**AE_model_input)
-    AE_model.load_state_dict(checkpoint['state_dict'])
-    AE_model.eval()
-    #use encoder and save data
-    #use deque to load consecutive 30 data
 
-    integration_net = _
-
-    combined_model = CombinedModel(AE_model, )
+    model = ManifoldNavigator(**model_input)
     print("Train")
     trainer.fit(model=model, datamodule=data_module)
     

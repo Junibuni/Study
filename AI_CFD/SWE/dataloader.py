@@ -10,6 +10,7 @@ from torchvision.transforms import transforms
 import lightning.pytorch as pl
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 from utils import norm_p
 
@@ -120,15 +121,14 @@ class DataModule(pl.LightningDataModule):
     def test_dataloader(self):
         return DataLoader(self.test_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)
 # %%
-
-# TODO    
+ 
 class LinearDataSet(Dataset):
-    def __init__(self, root_dir, seqlen=30, pnum=6):
+    def __init__(self, file_list, root_dir, seqlen=30, pnum=6):
         super(LinearDataSet, self).__init__()
-        self.root_dir = root_dir
-        self.seqlen = seqlen
+        self.root_dir = os.path.join(root_dir, "linear")
+        self.sequence_length = seqlen
         self.pnum = pnum
-        self.file_list = os.listdir(root_dir)
+        self.file_list = file_list
 
     def __len__(self):
         return len(self.file_list)
@@ -147,3 +147,27 @@ class LinearDataSet(Dataset):
         target_tensor = torch.tensor(target, dtype=torch.float32)
 
         return sequence_tensor, target_tensor
+#%%
+class LinearDataModule(pl.LightningDataModule):
+    def __init__(self, data_dir, batch_size=32, seqlen=30, pnum=6, val_size=0.3, random_state=42):
+        super().__init__()
+        self.data_dir = data_dir
+        self.batch_size = batch_size
+        self.seqlen = seqlen
+        self.pnum = pnum
+        self.val_size = val_size
+        self.random_state = random_state
+
+    def setup(self, stage=None):
+        file_list = os.listdir(os.path.join(self.data_dir, "linear"))
+        train_files, val_files = train_test_split(file_list, test_size=self.val_size, random_state=self.random_state)
+        
+        self.train_dataset = LinearDataSet(train_files, self.data_dir, seqlen=self.seqlen, pnum=self.pnum)
+        self.val_dataset = LinearDataSet(val_files, self.data_dir, seqlen=self.seqlen, pnum=self.pnum)
+
+    def train_dataloader(self):
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)
+
+    def val_dataloader(self):
+        return DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)
+#%%
