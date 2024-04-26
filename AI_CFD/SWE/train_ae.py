@@ -56,7 +56,13 @@ def main(args):
 
     model_input = dict(
         optim_params = dict(lr=args.lr, betas=(0.9, 0.999)),
-        scheduler_params = dict(step_size=1, gamma=0.5),
+        scheduler_params = dict(first_cycle_steps = 20,
+                                cycle_mult = 1,
+                                max_lr = args.lr,
+                                min_lr = 1e-6,
+                                warmup_steps = 2,
+                                gamma = 0.5,
+                                last_epoch = -1),
         input_size = (args.batch_size, 4, 384, 256),
         cnum = args.cnum,
         pnum = args.pnum,
