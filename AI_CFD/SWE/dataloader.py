@@ -138,8 +138,8 @@ class LinearDataSet(Dataset):
         data = np.load(file_name)  
         num_frames = data.shape[0]
 
-        start_index = np.random.randint(0, num_frames - self.sequence_length)
-
+        #start_index = np.random.randint(0, num_frames - self.sequence_length)
+        start_index = 0
         sequence = data[start_index:start_index+self.sequence_length]
         target = data[start_index+self.sequence_length][:-self.pnum]
 
@@ -166,7 +166,7 @@ class LinearDataModule(pl.LightningDataModule):
         self.val_dataset = LinearDataSet(val_files, self.data_dir, seqlen=self.seqlen, pnum=self.pnum)
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True, shuffle=True)
 
     def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)

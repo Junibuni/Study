@@ -92,7 +92,7 @@ class SWE_AE(pl.LightningModule):
         return loss
     
 class ManifoldNavigator(pl.LightningModule):
-    def __init__(self, *, cnum=32, pnum=6, model_type="linear", batch_size, optim_params=None, hidden_shape=128, dropout=0, weight_decay=0.001):
+    def __init__(self, *, cnum=32, pnum=6, model_type="linear", batch_size, optim_params, scheduler_params, hidden_shape=128, dropout=0, weight_decay=0.001):
         super(ManifoldNavigator, self).__init__()
         assert (model_type in ["linear", "lstm"]), f"{model_type} is not valid"
         self.save_hyperparameters()
@@ -120,7 +120,7 @@ class ManifoldNavigator(pl.LightningModule):
         output = self.forward(input_data)
         loss = self.loss(output, target_data)
 
-        loss += self.l2_regularization()
+        #loss += self.l2_regularization()
 
         return loss
     
@@ -139,7 +139,8 @@ class ManifoldNavigator(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), **self.hparams.optim_params)
-        return optimizer
+        scheduler = StepLR(optimizer, **self.hparams.scheduler_params)
+        return [optimizer], [scheduler]
     
     def l2_regularization(self):
         l2_loss = 0
