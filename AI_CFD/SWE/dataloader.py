@@ -122,52 +122,115 @@ class DataModule(pl.LightningDataModule):
         return DataLoader(self.test_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)
 # %%
  
+# class LinearDataSet(Dataset):
+#     def __init__(self, file_list, root_dir, seqlen=30, pnum=6):
+#         super(LinearDataSet, self).__init__()
+#         self.root_dir = os.path.join(root_dir, "linear")
+#         self.sequence_length = seqlen
+#         self.pnum = pnum
+#         self.file_list = file_list
+
+#     def __len__(self):
+#         return len(self.file_list)
+
+#     def __getitem__(self, idx):
+#         file_name = os.path.join(self.root_dir, self.file_list[idx])
+#         data = np.load(file_name)  
+#         num_frames = data.shape[0]
+
+#         #start_index = np.random.randint(0, num_frames - self.sequence_length)
+#         start_index = 0
+#         sequence = data[start_index:start_index+self.sequence_length]
+#         target = data[start_index+self.sequence_length][:-self.pnum]
+
+#         sequence_tensor = torch.tensor(sequence, dtype=torch.float32)
+#         target_tensor = torch.tensor(target, dtype=torch.float32)
+
+#         return sequence_tensor, target_tensor
+#%%
+
 class LinearDataSet(Dataset):
-    def __init__(self, file_list, root_dir, seqlen=30, pnum=6):
+    def __init__(self, root_dir, seqlen=30, pnum=6):
         super(LinearDataSet, self).__init__()
         self.root_dir = os.path.join(root_dir, "linear")
         self.sequence_length = seqlen
         self.pnum = pnum
-        self.file_list = file_list
+        
+        self.data_files = os.listdir(self.root_dir)
+        self.data = self.load_data()
+
+    def load_data(self):
+        data = []
+        for file in self.data_files:
+            file_path = os.path.join(self.root_dir, file)
+            numpy_data = np.load(file_path)
+            for i, _ in enumerate(numpy_data):
+                idx = i + self.sequence_length
+                idx_target = idx + 1
+                if idx_target > len(numpy_data):
+                    break
+                seq_x = numpy_data[i:idx]
+                seq_y = numpy_data[idx_target-1, :-self.pnum]
+                data.append((seq_x, seq_y))
+        return data
 
     def __len__(self):
-        return len(self.file_list)
+        return len(self.data)
 
     def __getitem__(self, idx):
-        file_name = os.path.join(self.root_dir, self.file_list[idx])
-        data = np.load(file_name)  
-        num_frames = data.shape[0]
-
-        #start_index = np.random.randint(0, num_frames - self.sequence_length)
-        start_index = 0
-        sequence = data[start_index:start_index+self.sequence_length]
-        target = data[start_index+self.sequence_length][:-self.pnum]
-
+        sequence, target = self.data[idx]
         sequence_tensor = torch.tensor(sequence, dtype=torch.float32)
         target_tensor = torch.tensor(target, dtype=torch.float32)
 
         return sequence_tensor, target_tensor
-#%%
+    
 class LinearDataModule(pl.LightningDataModule):
-    def __init__(self, data_dir, batch_size=32, seqlen=30, pnum=6, val_size=0.3, random_state=42):
-        super().__init__()
-        self.data_dir = data_dir
+    def __init__(self, root_dir, batch_size=32, validation_split=0.2, seqlen=30, pnum=6, seed=42):
+        super(LinearDataModule, self).__init__()
+        self.root_dir = root_dir
         self.batch_size = batch_size
+        self.validation_split = validation_split
         self.seqlen = seqlen
         self.pnum = pnum
-        self.val_size = val_size
-        self.random_state = random_state
+        self.seed = seed
+
+    def prepare_data(self):
+        # Download, prepare, or preprocess data here.
+        pass
 
     def setup(self, stage=None):
-        file_list = os.listdir(os.path.join(self.data_dir, "linear"))
-        train_files, val_files = train_test_split(file_list, test_size=self.val_size, random_state=self.random_state)
-        
-        self.train_dataset = LinearDataSet(train_files, self.data_dir, seqlen=self.seqlen, pnum=self.pnum)
-        self.val_dataset = LinearDataSet(val_files, self.data_dir, seqlen=self.seqlen, pnum=self.pnum)
+        dataset = LinearDataSet(self.root_dir, seqlen=self.seqlen, pnum=self.pnum)
+        train_size = int((1 - self.validation_split) * len(dataset))
+        val_size = len(dataset) - train_size
+        self.train_dataset, self.val_dataset = random_split(dataset, [train_size, val_size], generator=torch.Generator().manual_seed(self.seed))
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True, shuffle=True)
 
     def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)
+#%%
+
+# class LinearDataModule(pl.LightningDataModule):
+#     def __init__(self, data_dir, batch_size=32, seqlen=30, pnum=6, val_size=0.3, random_state=42):
+#         super().__init__()
+#         self.data_dir = data_dir
+#         self.batch_size = batch_size
+#         self.seqlen = seqlen
+#         self.pnum = pnum
+#         self.val_size = val_size
+#         self.random_state = random_state
+
+#     def setup(self, stage=None):
+#         file_list = os.listdir(os.path.join(self.data_dir, "linear"))
+#         train_files, val_files = train_test_split(file_list, test_size=self.val_size, random_state=self.random_state)
+        
+#         self.train_dataset = LinearDataSet(train_files, self.data_dir, seqlen=self.seqlen, pnum=self.pnum)
+#         self.val_dataset = LinearDataSet(val_files, self.data_dir, seqlen=self.seqlen, pnum=self.pnum)
+
+#     def train_dataloader(self):
+#         return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True, shuffle=True)
+
+#     def val_dataloader(self):
+#         return DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)
 #%%

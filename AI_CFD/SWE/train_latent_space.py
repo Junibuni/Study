@@ -16,7 +16,7 @@ def argument_parser():
     parser.add_argument("--log_pth", default="AI_CFD\SWE\logs", type=str)
     parser.add_argument("--mode", default="train", choices=["train", "test"], type=str)
     parser.add_argument("--lr", default=1e-3, type=float)
-    parser.add_argument("--batch_size", default=4, type=int)
+    parser.add_argument("--batch_size", default=32, type=int)
     parser.add_argument("--num_epoch", default=100000, type=int)
     parser.add_argument("--device", default="gpu", type=str)
     parser.add_argument("--precision", default="16-mixed", type=str)
@@ -34,7 +34,7 @@ def main(args):
     torch.set_float32_matmul_precision("medium")
     seed_everything(args.seed)
 
-    version_name = "drop03"
+    version_name = "stepLRtest3"
     csv_logger = CSVLogger(args.log_pth, name="latnet\CSVLogger", version=version_name)
     tb_logger = TensorBoardLogger(save_dir=args.log_pth, name="latnet\TBLogger", version=version_name)
 
@@ -52,18 +52,17 @@ def main(args):
                       )
     
     #perhaps sorting?
-    data_module = LinearDataModule(data_dir=args.dataset_pth, batch_size=args.batch_size, seqlen=350)
+    data_module = LinearDataModule(root_dir=args.dataset_pth, batch_size=args.batch_size, validation_split=0.2, seqlen=30, pnum=args.pnum, seed=args.seed)
     
     model_input = dict(
         optim_params = dict(lr=args.lr),
         scheduler_params = dict(gamma = 0.95,
-                                step_size = 2000),
+                                step_size = 100),
         cnum = args.cnum,
         pnum = args.pnum,
         model_type = "lstm",
         batch_size=args.batch_size,
-        hidden_shape = 28,
-        dropout = 0.3
+        hidden_shape = 28
     )
 
     model = ManifoldNavigator(**model_input)
