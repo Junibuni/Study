@@ -11,7 +11,7 @@ from tqdm import tqdm
 from utils import unnormalize
 import matplotlib.pyplot as plt
 
-ckpt_pth = r"D:\epoch=99-step=24300.ckpt"
+ckpt_pth = r"D:\Study\AI_CFD\SWE\logs\epoch=664-step=161595.ckpt"
 checkpoint = torch.load(ckpt_pth)
 
 model_input = dict(

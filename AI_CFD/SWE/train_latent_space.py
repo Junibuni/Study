@@ -21,7 +21,7 @@ def argument_parser():
     parser.add_argument("--device", default="gpu", type=str)
     parser.add_argument("--precision", default="16-mixed", type=str)
     parser.add_argument("--max_train_batch", default=1.0, type=float) #for test (ratio)
-    parser.add_argument("--log_step", default=1, type=int)
+    parser.add_argument("--log_step", default=10, type=int)
     parser.add_argument("--dataset_pth", default=r"AI_CFD\SWE\datasets", type=str)
     parser.add_argument("--seed", default=42, type=int, dest="seed")
     parser.add_argument("--cnum", default=32, type=int, dest="cnum")
@@ -34,7 +34,7 @@ def main(args):
     torch.set_float32_matmul_precision("medium")
     seed_everything(args.seed)
 
-    version_name = "stepLRtest3"
+    version_name = "finaltest"
     csv_logger = CSVLogger(args.log_pth, name="latnet\CSVLogger", version=version_name)
     tb_logger = TensorBoardLogger(save_dir=args.log_pth, name="latnet\TBLogger", version=version_name)
 
@@ -56,7 +56,7 @@ def main(args):
     
     model_input = dict(
         optim_params = dict(lr=args.lr),
-        scheduler_params = dict(gamma = 0.95,
+        scheduler_params = dict(gamma = 0.9,
                                 step_size = 100),
         cnum = args.cnum,
         pnum = args.pnum,

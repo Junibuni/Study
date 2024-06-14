@@ -18,7 +18,7 @@ from models import Encoder, Decoder
 from utils import depth_gradient_loss, CosineAnnealingWarmupRestarts
 
 class SWE_AE(pl.LightningModule):
-    def __init__(self, *, optim_params, scheduler_params, input_size, mode="ae", cnum=32, pnum=6, in_c=3, out_c=1, loss_ratio=[1., 1., 1.0]):
+    def __init__(self, *, optim_params=None, scheduler_params=None, input_size=(1, 3, 384, 256), mode="ae", cnum=32, pnum=6, in_c=3, out_c=1, loss_ratio=[1., 1., 1.0]):
         # mode: ae, comp, sim
         super(SWE_AE, self).__init__()
         self.save_hyperparameters()
@@ -92,7 +92,7 @@ class SWE_AE(pl.LightningModule):
         return loss
     
 class ManifoldNavigator(pl.LightningModule):
-    def __init__(self, *, cnum=32, pnum=6, model_type="linear", batch_size, optim_params, scheduler_params, hidden_shape=128, dropout=0, weight_decay=0.001):
+    def __init__(self, *, cnum=32, pnum=6, model_type="lstm", batch_size=1, optim_params=None, scheduler_params=None, hidden_shape=128, dropout=0, weight_decay=0.001):
         super(ManifoldNavigator, self).__init__()
         assert (model_type in ["linear", "lstm"]), f"{model_type} is not valid"
         self.save_hyperparameters()
@@ -167,8 +167,8 @@ class LSTMNavigator(nn.Module):
         # lstm_out = (batch_size, seq_len, hidden_size)
         h_0 = self.h_0.clone().detach()
         c_0 = self.c_0.clone().detach()
-        lstm_out, _ = self.lstm(input, (h_0, c_0))
-        output = self.fc(lstm_out[:, -1, :])
+        lstm_out, _ = self.lstm(input)
+        output = self.fc(lstm_out[:, -1])
         return output
     
 class LinearNavigator(nn.Module):
