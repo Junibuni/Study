@@ -11,13 +11,14 @@ from tqdm import tqdm
 from utils import unnormalize
 import matplotlib.pyplot as plt
 
-ckpt_pth = r"D:\Study\AI_CFD\SWE\logs\epoch=664-step=161595.ckpt"
+ckpt_pth = r"D:\Study\AI_CFD\SWE\logs\epoch=917-step=223074.ckpt"
 checkpoint = torch.load(ckpt_pth)
 
 model_input = dict(
     optim_params = dict(lr=2e-4),
     scheduler_params = dict(),
-    input_size = (1, 3, 384, 256)
+    input_size = (1, 3, 384, 256),
+    cnum = 64
 )
 model = SWE_AE(**model_input)
 model.load_state_dict(checkpoint['state_dict'])

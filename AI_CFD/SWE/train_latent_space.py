@@ -15,7 +15,7 @@ def argument_parser():
 
     parser.add_argument("--log_pth", default="AI_CFD\SWE\logs", type=str)
     parser.add_argument("--mode", default="train", choices=["train", "test"], type=str)
-    parser.add_argument("--lr", default=1e-3, type=float)
+    parser.add_argument("--lr", default=1e-8, type=float)
     parser.add_argument("--batch_size", default=32, type=int)
     parser.add_argument("--num_epoch", default=100000, type=int)
     parser.add_argument("--device", default="gpu", type=str)
@@ -24,7 +24,7 @@ def argument_parser():
     parser.add_argument("--log_step", default=10, type=int)
     parser.add_argument("--dataset_pth", default=r"AI_CFD\SWE\datasets", type=str)
     parser.add_argument("--seed", default=42, type=int, dest="seed")
-    parser.add_argument("--cnum", default=32, type=int, dest="cnum")
+    parser.add_argument("--cnum", default=64+6, type=int, dest="cnum")
     parser.add_argument("--pnum", default=6, type=int, dest="pnum")
 
 
@@ -34,7 +34,7 @@ def main(args):
     torch.set_float32_matmul_precision("medium")
     seed_everything(args.seed)
 
-    version_name = "finaltest"
+    version_name = "linear_64_TEST_original3_lr4_noshuffle"
     csv_logger = CSVLogger(args.log_pth, name="latnet\CSVLogger", version=version_name)
     tb_logger = TensorBoardLogger(save_dir=args.log_pth, name="latnet\TBLogger", version=version_name)
 
@@ -51,16 +51,14 @@ def main(args):
                       callbacks=[lr_monitor]
                       )
     
-    #perhaps sorting?
-    data_module = LinearDataModule(root_dir=args.dataset_pth, batch_size=args.batch_size, validation_split=0.2, seqlen=30, pnum=args.pnum, seed=args.seed)
+    data_module = LinearDataModule(root_dir=args.dataset_pth, batch_size=args.batch_size, validation_split=0.2, seqlen=1, pnum=args.pnum, seed=args.seed, type='original', shuffle=False)
     
     model_input = dict(
         optim_params = dict(lr=args.lr),
-        scheduler_params = dict(gamma = 0.9,
-                                step_size = 100),
+        scheduler_params = dict(gamma = 0.95, step_size = 300),
         cnum = args.cnum,
         pnum = args.pnum,
-        model_type = "lstm",
+        model_type = "original",
         batch_size=args.batch_size,
         hidden_shape = 28
     )

@@ -150,11 +150,12 @@ class DataModule(pl.LightningDataModule):
 #%%
 
 class LinearDataSet(Dataset):
-    def __init__(self, root_dir, seqlen=30, pnum=6):
+    def __init__(self, root_dir, seqlen=30, pnum=6, type=None):
         super(LinearDataSet, self).__init__()
         self.root_dir = os.path.join(root_dir, "linear")
         self.sequence_length = seqlen
         self.pnum = pnum
+        self.type = type
         
         self.data_files = os.listdir(self.root_dir)
         self.data = self.load_data()
@@ -171,6 +172,9 @@ class LinearDataSet(Dataset):
                     break
                 seq_x = numpy_data[i:idx]
                 seq_y = numpy_data[idx_target-1, :-self.pnum]
+                if self.type == "original":
+                    dp = numpy_data[idx_target-1, -self.pnum:]-seq_x.squeeze()[-self.pnum:]
+                    seq_x = np.concatenate([seq_x, dp.reshape(1, -1)], axis=1)
                 data.append((seq_x, seq_y))
         return data
 
@@ -183,9 +187,10 @@ class LinearDataSet(Dataset):
         target_tensor = torch.tensor(target, dtype=torch.float32)
 
         return sequence_tensor, target_tensor
-    
+#%%
+
 class LinearDataModule(pl.LightningDataModule):
-    def __init__(self, root_dir, batch_size=32, validation_split=0.2, seqlen=30, pnum=6, seed=42):
+    def __init__(self, root_dir, batch_size=32, validation_split=0.2, seqlen=30, pnum=6, seed=42, type=None, shuffle=True):
         super(LinearDataModule, self).__init__()
         self.root_dir = root_dir
         self.batch_size = batch_size
@@ -193,19 +198,21 @@ class LinearDataModule(pl.LightningDataModule):
         self.seqlen = seqlen
         self.pnum = pnum
         self.seed = seed
+        self.type = type
+        self.shuffle = shuffle
 
     def prepare_data(self):
         # Download, prepare, or preprocess data here.
         pass
 
     def setup(self, stage=None):
-        dataset = LinearDataSet(self.root_dir, seqlen=self.seqlen, pnum=self.pnum)
+        dataset = LinearDataSet(self.root_dir, seqlen=self.seqlen, pnum=self.pnum, type=self.type)
         train_size = int((1 - self.validation_split) * len(dataset))
         val_size = len(dataset) - train_size
         self.train_dataset, self.val_dataset = random_split(dataset, [train_size, val_size], generator=torch.Generator().manual_seed(self.seed))
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True, shuffle=True)
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True, shuffle=self.shuffle)
 
     def val_dataloader(self):
         return DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=4, pin_memory=True, persistent_workers=True, drop_last=True)

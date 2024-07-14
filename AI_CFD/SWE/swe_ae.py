@@ -94,7 +94,7 @@ class SWE_AE(pl.LightningModule):
 class ManifoldNavigator(pl.LightningModule):
     def __init__(self, *, cnum=32, pnum=6, model_type="lstm", batch_size=1, optim_params=None, scheduler_params=None, hidden_shape=128, dropout=0, weight_decay=0.001):
         super(ManifoldNavigator, self).__init__()
-        assert (model_type in ["linear", "lstm"]), f"{model_type} is not valid"
+        assert (model_type in ["linear", "lstm", "original"]), f"{model_type} is not valid"
         self.save_hyperparameters()
 
         in_shape = self.hparams.cnum
@@ -107,6 +107,8 @@ class ManifoldNavigator(pl.LightningModule):
                 self.integration_net = LinearNavigator(in_shape, out_shape)
             case "lstm":
                 self.integration_net = LSTMNavigator(in_shape, hidden_shape, out_shape, batch_size, dropout)
+            case "original":
+                self.integration_net = OriginalNavigator(in_shape, out_shape-self.hparams.pnum)
             case _:
                 raise NotImplementedError(f"model not implementd")
         
@@ -118,9 +120,12 @@ class ManifoldNavigator(pl.LightningModule):
     
     def shared_step(self, input_data, target_data):
         output = self.forward(input_data)
+        batch_size, seq_len, feature_len = input_data.shape
+        if self.hparams.model_type == "original":
+            _, out_len = target_data.shape
+            assert seq_len == 1
+            target_data = target_data - input_data.clone().detach().reshape(batch_size, feature_len)[:, :out_len]
         loss = self.loss(output, target_data)
-
-        #loss += self.l2_regularization()
 
         return loss
     
@@ -141,15 +146,50 @@ class ManifoldNavigator(pl.LightningModule):
         optimizer = torch.optim.Adam(self.parameters(), **self.hparams.optim_params)
         scheduler = StepLR(optimizer, **self.hparams.scheduler_params)
         return [optimizer], [scheduler]
+
+class OriginalNavigator(nn.Module):
+    def __init__(self, input_size, output_size):
+        super(OriginalNavigator, self).__init__()
+
+        self.layers = nn.Sequential(
+            nn.Linear(input_size, 256),
+            nn.ELU(),
+            nn.BatchNorm1d(256),
+            nn.Dropout(p=0.2),
+
+            nn.Linear(256, 512),
+            nn.ELU(),
+            nn.BatchNorm1d(512),
+            nn.Dropout(p=0.2),
+
+            nn.Linear(512, 256),
+            nn.ELU(),
+            nn.BatchNorm1d(256),
+            nn.Dropout(p=0.2),
+
+            nn.Linear(256, 128),
+            nn.ELU(),
+            nn.BatchNorm1d(128),
+            nn.Dropout(p=0.2),
+
+            nn.Linear(128, 64),
+            nn.ELU(),
+            nn.BatchNorm1d(64),
+            nn.Dropout(p=0.2),
+
+            nn.Linear(64, output_size)
+        )
+
+    def forward(self, x):
+        batch_size, seq_len, feature_len = x.size()
+        x = x.view(batch_size * seq_len, feature_len)
+        x = self.layers(x)
+        x = x.view(batch_size, seq_len, -1)
+        return x[:, -1, :]
     
-    def l2_regularization(self):
-        l2_loss = 0
-        for param in self.parameters():
-            l2_loss += torch.norm(param, p=2)
-        return self.weight_decay * l2_loss
-    
+
 class LSTMNavigator(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, batch_size, dropout, num_layers=1):
+    def __init__(self, input_size, hidden_size, output_size, batch_size, dropout, num_layers=2):
         super(LSTMNavigator, self).__init__()
         self.lstm = nn.LSTM(input_size=input_size,
                             hidden_size=hidden_size,
@@ -158,37 +198,55 @@ class LSTMNavigator(nn.Module):
                             dropout=dropout)
         self.fc = nn.Linear(hidden_size, output_size)
         
-        h_0 = Variable(torch.zeros(num_layers, batch_size, hidden_size))
-        c_0 = Variable(torch.zeros(num_layers, batch_size, hidden_size))
-        self.register_buffer("h_0", h_0)
-        self.register_buffer("c_0", c_0)
+        # h_0 = Variable(torch.zeros(num_layers, batch_size, hidden_size))
+        # c_0 = Variable(torch.zeros(num_layers, batch_size, hidden_size))
+        # self.register_buffer("h_0", h_0)
+        # self.register_buffer("c_0", c_0)
 
-    def forward(self, input):
+    def forward(self, x):
         # lstm_out = (batch_size, seq_len, hidden_size)
-        h_0 = self.h_0.clone().detach()
-        c_0 = self.c_0.clone().detach()
-        lstm_out, _ = self.lstm(input)
-        output = self.fc(lstm_out[:, -1])
-        return output
+        # h_0 = self.h_0.clone().detach()
+        # c_0 = self.c_0.clone().detach()
+        # lstm_out, _ = self.lstm(input)
+        # output = self.fc(lstm_out[:, -1])
+        # return output
+        out, _ = self.lstm(x)
+        out = self.fc(out[:, -1, :])
+        return out
     
 class LinearNavigator(nn.Module):
     def __init__(self, input_size, output_size):
         super().__init__()
         self.layers = nn.Sequential(
-            nn.Linear(input_size, 1024, bias=False),
+            nn.Linear(input_size, 256, bias=False),
             nn.ReLU(),
-            nn.BatchNorm1d(1024),
-            nn.Dropout(0.1),
-            
-            nn.Linear(1024, 512, bias=False),
+            nn.BatchNorm1d(256),
+            nn.Dropout(p=0.2),
+
+            nn.Linear(256, 512, bias=False),
             nn.ReLU(),
             nn.BatchNorm1d(512),
-            nn.Dropout(0.1),
+            nn.Dropout(p=0.2),
 
-            nn.Linear(512, output_size, bias=False), # Δz_t (cnum-pnum): pnum is supervised
+            nn.Linear(512, 256, bias=False),
+            nn.ReLU(),
+            nn.BatchNorm1d(256),
+            nn.Dropout(p=0.2),
+
+            nn.Linear(256, 128, bias=False),
+            nn.ReLU(),
+            nn.BatchNorm1d(128),
+            nn.Dropout(p=0.2),
+
+            nn.Linear(128, 64, bias=False),
+            nn.ReLU(),
+            nn.BatchNorm1d(64),
+            nn.Dropout(p=0.2),
+
+            nn.Linear(64, output_size, bias=False),
             nn.ReLU(),
             nn.BatchNorm1d(output_size),
-            nn.Dropout(0.1)
+            nn.Dropout(p=0.2),
         )
     
     def forward(self, x):
