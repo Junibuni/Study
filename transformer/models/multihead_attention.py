@@ -16,6 +16,7 @@ class MultiHeadAttention(nn.Module):
         self.out_linear = nn.Linear(embedding_dim, embedding_dim)
         
     def split_heads(self, x, batch_size):
+        # Split by head_dim (num_heads)
         return x.view(batch_size, -1, self.num_heads, self.head_dim).transpose(1, 2)
 
     def forward(self, query, key, value, mask=None):
