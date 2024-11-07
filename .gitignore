@@ -4,6 +4,7 @@ Papers
 .DS_Store
 */.DS_Store/*
 .data
+*/data
 */.data/*
 .datasets
 */datasets/*
